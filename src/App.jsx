@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { API_URL } from "./config";
 import {
   Brain,
   MessageSquare,
@@ -106,7 +107,7 @@ export default function App() {
 
   async function loadConversations() {
     try {
-      const res = await fetch("http://localhost:3001/api/conversations");
+      const res = await fetch("${API_URL}/api/conversations");
       const data = await res.json();
 
       setHistory(data);
@@ -117,7 +118,7 @@ export default function App() {
 
   async function clearHistory() {
     try {
-      await fetch("http://localhost:3001/api/conversations", {
+      await fetch("${API_URL}/api/conversations", {
         method: "DELETE"
       });
 
@@ -146,7 +147,7 @@ export default function App() {
     setHistory((prev) => [tempMessage, ...prev]);
 
     try {
-      const res = await fetch("http://localhost:3001/api/agent", {
+      const res = await fetch("${API_URL}/api/agent", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
