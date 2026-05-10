@@ -201,6 +201,32 @@ export default function App() {
     }
   }
 
+  async function completeTask(taskId) {
+    try {
+      const res = await fetch(`${API_URL}/api/tasks`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          id: taskId,
+          status: "done",
+          completed: true
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur mise à jour tâche");
+      }
+
+      await loadDashboard();
+    } catch (error) {
+      alert("Erreur tâche : " + error.message);
+    }
+  }
+
   async function handleSend() {
     if (!userInput.trim() || isLoading) return;
 
@@ -424,7 +450,7 @@ export default function App() {
                   <h3>Dernières tâches</h3>
                 </div>
 
-                <TaskList tasks={tasks.slice(0, 5)} />
+                <TaskList tasks={tasks.slice(0, 5)} onComplete={completeTask} />
               </div>
             </section>
           </>
@@ -513,7 +539,7 @@ export default function App() {
             />
 
             <section className="panel">
-              <TaskList tasks={tasks} full />
+              <TaskList tasks={tasks} full onComplete={completeTask} />
             </section>
           </>
         )}
@@ -602,7 +628,7 @@ function KpiCard({ title, value, icon: Icon }) {
   );
 }
 
-function TaskList({ tasks, full = false }) {
+function TaskList({ tasks, full = false, onComplete }) {
   if (!tasks || tasks.length === 0) {
     return <p className="empty">Aucune tâche enregistrée.</p>;
   }
@@ -610,16 +636,46 @@ function TaskList({ tasks, full = false }) {
   return (
     <div className="task-list">
       {tasks.map((task) => (
-        <div className="task-card" key={task.id}>
+        <div
+          className={
+            task.completed || task.status === "done"
+              ? "task-card completed"
+              : "task-card"
+          }
+          key={task.id}
+        >
           <div>
-            <span className="status">{task.status || "open"}</span>
+            <div className="task-tags">
+              <span className={`status ${task.status || "open"}`}>
+                {task.status || "open"}
+              </span>
+
+              <span className={`priority ${task.priority || "medium"}`}>
+                {task.priority || "medium"}
+              </span>
+
+              <span className="task-type">{task.type || "general"}</span>
+            </div>
+
             <strong>{task.title || "Tâche sans titre"}</strong>
+
             {full && <p>{task.description}</p>}
           </div>
 
-          <small>
-            {task.from_agent || "Agent"} → {task.to_agent || "Agent"}
-          </small>
+          <div className="task-side">
+            <small>
+              {task.from_agent || "Agent"} → {task.to_agent || "Agent"}
+            </small>
+
+            {task.status !== "done" && (
+              <button
+                className="done-button"
+                onClick={() => onComplete(task.id)}
+              >
+                Terminer
+              </button>
+            )}
+          </div>
         </div>
       ))}
     </div>
