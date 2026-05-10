@@ -2,47 +2,53 @@ import { createClient } from "@supabase/supabase-js";
 
 export default async function handler(req, res) {
   try {
-    const supabase = createClient(
-      process.env.SANDWICH_SUPABASE_URL,
-      process.env.SANDWICH_SUPABASE_SERVICE_ROLE_KEY
-    );
+    const sandwichUrl = process.env.SANDWICH_SUPABASE_URL;
+    const sandwichKey = process.env.SANDWICH_SUPABASE_SERVICE_ROLE_KEY;
 
-    const { data: orders } = await supabase
+    if (!sandwichUrl || !sandwichKey) {
+      return res.status(500).json({
+        error: "Variables Supabase Sandwich manquantes"
+      });
+    }
+
+    const sandwichSupabase = createClient(sandwichUrl, sandwichKey);
+
+    const { data: orders, error: ordersError } = await sandwichSupabase
       .from("orders")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(50);
 
-    const { data: products } = await supabase
+    if (ordersError) throw ordersError;
+
+    const { data: products, error: productsError } = await sandwichSupabase
       .from("products")
-      .select("*");
+      .select("*")
+      .order("name", { ascending: true });
 
-    const paidOrders =
-      orders?.filter(
-        (o) =>
-          o.status === "payée" ||
-          o.status === "livrée" ||
-          o.status === "en_preparation"
-      ) || [];
+    if (productsError) throw productsError;
 
-    const revenue = paidOrders.reduce(
-      (sum, order) => sum + Number(order.total_amount || 0),
-      0
+    const paidStatuses = ["payée", "payee", "livrée", "livree", "en_preparation"];
+
+    const paidOrders = (orders || []).filter((order) =>
+      paidStatuses.includes(String(order.status || "").toLowerCase())
     );
 
-    const lowStock =
-      products?.filter(
-        (p) =>
-          Number(
-            p.stock_quantity || p.stock || 0
-          ) <= 3
-      ) || [];
+    const revenue = paidOrders.reduce((sum, order) => {
+      return sum + Number(order.total_amount || order.total_price || 0);
+    }, 0);
+
+    const lowStock = (products || []).filter((product) => {
+      const stock = Number(product.stock_quantity ?? product.stock ?? 0);
+      return stock <= 3;
+    });
 
     return res.status(200).json({
       revenue,
       totalOrders: orders?.length || 0,
       paidOrders: paidOrders.length,
       lowStock,
+      products: products || [],
       recentOrders: orders?.slice(0, 10) || []
     });
   } catch (error) {

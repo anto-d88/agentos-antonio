@@ -147,6 +147,101 @@ async function saveMemoryIfImportant(supabase, agentName, userMessage) {
   ]);
 }
 
+async function getBusinessData() {
+  try {
+    const sandwichUrl = process.env.SANDWICH_SUPABASE_URL;
+    const sandwichKey = process.env.SANDWICH_SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!sandwichUrl || !sandwichKey) {
+      return {
+        available: false,
+        text: "Données La Pause Sandwich non connectées."
+      };
+    }
+
+    const sandwichSupabase = createClient(sandwichUrl, sandwichKey);
+
+    const { data: products } = await sandwichSupabase
+      .from("products")
+      .select("*")
+      .order("name", { ascending: true })
+      .limit(100);
+
+    const { data: orders } = await sandwichSupabase
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    const paidStatuses = ["payée", "payee", "livrée", "livree", "en_preparation"];
+
+    const paidOrders = (orders || []).filter((order) =>
+      paidStatuses.includes(String(order.status || "").toLowerCase())
+    );
+
+    const revenue = paidOrders.reduce((sum, order) => {
+      return sum + Number(order.total_amount || order.total_price || 0);
+    }, 0);
+
+    const productLines = (products || [])
+      .map((product) => {
+        const stock = Number(product.stock_quantity ?? product.stock ?? 0);
+        const price = Number(product.price || product.unit_price || 0);
+
+        return `- ${product.name || product.title || "Produit sans nom"} | stock: ${stock} | prix: ${price}€ | actif: ${
+          product.is_active ?? product.active ?? "non précisé"
+        }`;
+      })
+      .join("\n");
+
+    const lowStockLines = (products || [])
+      .filter((product) => {
+        const stock = Number(product.stock_quantity ?? product.stock ?? 0);
+        return stock <= 3;
+      })
+      .map((product) => {
+        const stock = Number(product.stock_quantity ?? product.stock ?? 0);
+        return `- ${product.name || product.title || "Produit sans nom"} : ${stock}`;
+      })
+      .join("\n");
+
+    const recentOrderLines = (orders || [])
+      .slice(0, 10)
+      .map((order) => {
+        return `- Commande ${order.id} | statut: ${order.status || "non précisé"} | total: ${
+          order.total_amount || order.total_price || 0
+        }€ | date: ${order.created_at || ""}`;
+      })
+      .join("\n");
+
+    return {
+      available: true,
+      text: `
+DONNÉES RÉELLES LA PAUSE SANDWICH :
+
+CHIFFRES :
+- Commandes récentes analysées : ${orders?.length || 0}
+- Commandes payées/livrées/en préparation : ${paidOrders.length}
+- Chiffre d'affaires estimé sur ces commandes : ${revenue.toFixed(2)}€
+
+STOCK PRODUITS :
+${productLines || "Aucun produit trouvé."}
+
+STOCK FAIBLE :
+${lowStockLines || "Aucun stock faible détecté."}
+
+COMMANDES RÉCENTES :
+${recentOrderLines || "Aucune commande récente trouvée."}
+`
+    };
+  } catch (error) {
+    return {
+      available: false,
+      text: `Erreur lecture données La Pause Sandwich : ${error.message}`
+    };
+  }
+}
+
 export default async function handler(req, res) {
   try {
     if (req.method !== "POST") {
@@ -162,7 +257,7 @@ export default async function handler(req, res) {
 
     if (!supabaseUrl || !supabaseKey) {
       return res.status(500).json({
-        error: "Supabase non configuré"
+        error: "Supabase AgentOS non configuré"
       });
     }
 
@@ -200,6 +295,8 @@ export default async function handler(req, res) {
       .order("created_at", { ascending: false })
       .limit(10);
 
+    const businessData = await getBusinessData();
+
     const memoryText =
       memories?.map((m) => `- ${m.content}`).join("\n") || "Aucune mémoire.";
 
@@ -223,11 +320,16 @@ ${memoryText}
 TÂCHES OUVERTES :
 ${taskText}
 
+${businessData.text}
+
 RÈGLES :
 - Réponds toujours en français.
 - Sois concret, utile et direct.
 - Pas de blabla.
 - N'invente jamais de prénom, délai, prix, heure, adresse ou détail non donné.
+- Quand Antonio demande les chiffres du stock, utilise les données réelles ci-dessus.
+- Quand Antonio demande les commandes ou le chiffre d'affaires, utilise les données réelles ci-dessus.
+- Si une donnée n’est pas disponible, dis clairement qu’elle n’est pas disponible.
 - Pour les SMS : message prêt à envoyer uniquement.
 - Pour les mails : message prêt à envoyer uniquement.
 - Ton professionnel, humain et chaleureux.
@@ -235,8 +337,8 @@ RÈGLES :
 
     const completion = await groq.chat.completions.create({
       model: groqModel,
-      temperature: 0.4,
-      max_tokens: 600,
+      temperature: 0.3,
+      max_tokens: 900,
       messages: [
         {
           role: "system",
