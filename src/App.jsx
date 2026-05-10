@@ -148,6 +148,26 @@ useEffect(() => {
     loadDashboard();
   }, 60000);
 
+  const updateAlert = async (id, action) => {
+  try {
+    await fetch("/api/ops?action=alert-update", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        id,
+        action
+      })
+    });
+
+    loadAlerts();
+
+  } catch (err) {
+    console.error(err);
+  }
+};
+
   return () => clearInterval(interval);
 }, []);
 
@@ -483,6 +503,44 @@ async function runAutomation(showAlert = true) {
                       <div className="alert-card" key={index}>
                         <strong>{alert.title}</strong>
                         <p>{alert.message}</p>
+                        <div className="flex gap-2 mt-3 flex-wrap">
+
+  <button
+    onClick={() => updateAlert(alert.id, "read")}
+    className="bg-blue-500 text-white px-2 py-1 rounded"
+  >
+    ✓ Lu
+  </button>
+
+  <button
+    onClick={() => updateAlert(alert.id, "important")}
+    className="bg-yellow-500 text-black px-2 py-1 rounded"
+  >
+    ⭐ Important
+  </button>
+
+  <button
+    onClick={() => openPlanningModal(alert)}
+    className="bg-purple-500 text-white px-2 py-1 rounded"
+  >
+    📅 Planning
+  </button>
+
+  <button
+    onClick={() => updateAlert(alert.id, "complete")}
+    className="bg-green-600 text-white px-2 py-1 rounded"
+  >
+    ✅ Terminé
+  </button>
+
+  <button
+    onClick={() => updateAlert(alert.id, "delete")}
+    className="bg-red-600 text-white px-2 py-1 rounded"
+  >
+    🗑 Supprimer
+  </button>
+
+</div>
                       </div>
                     ))}
                   </div>
