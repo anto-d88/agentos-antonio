@@ -351,14 +351,22 @@ async function checkStock(req, res) {
       .limit(1);
 
     if (!existingAlert || existingAlert.length === 0) {
-      await agentos.from("agent_alerts").insert([
-        {
-          title: "Stock faible",
-          message: alertMessage,
-          priority: stock === 0 ? "urgent" : "high",
-          read: false
-        }
-      ]);
+await agentos.from("agent_alerts").insert([
+  {
+    title: "Stock faible",
+    message: alertMessage,
+    priority: stock === 0 ? "urgent" : "high",
+    read: false
+  }
+]);
+
+await sendTelegramMessage(
+  `🚨 Stock faible La Pause Sandwich\n\n📦 Produit : ${productName}\n📉 Stock actuel : ${stock}\n⚠️ Priorité : ${
+    stock === 0 ? "URGENT" : "HIGH"
+  }`
+);
+
+alertsCreated++;
 
       alertsCreated++;
     }
