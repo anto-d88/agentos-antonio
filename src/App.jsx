@@ -141,9 +141,15 @@ export default function App() {
   const [taskStatusFilter, setTaskStatusFilter] = useState("open");
   const [taskPriorityFilter, setTaskPriorityFilter] = useState("all");
 
-  useEffect(() => {
+useEffect(() => {
+  runAutomation(false);
+
+  const interval = setInterval(() => {
     loadDashboard();
-  }, []);
+  }, 60000);
+
+  return () => clearInterval(interval);
+}, []);
 
   async function loadDashboard() {
     try {
@@ -177,34 +183,24 @@ export default function App() {
     }
   }
 
-async function runAutomation() {
+async function runAutomation(showAlert = true) {
   try {
     setIsRefreshing(true);
 
-    await fetch(
-      `${API_URL}/api/ops?action=check-orders`
-    );
-
-    await fetch(
-      `${API_URL}/api/ops?action=check-stock`
-    );
-
-    await fetch(
-      `${API_URL}/api/check-alerts`
-    );
-
-    await fetch(
-      `${API_URL}/api/auto-director`
-    );
+    await fetch(`${API_URL}/api/ops?action=check-orders`);
+    await fetch(`${API_URL}/api/ops?action=check-stock`);
+    await fetch(`${API_URL}/api/ops?action=check-alerts`);
+    await fetch(`${API_URL}/api/ops?action=auto-director`);
 
     await loadDashboard();
 
-    alert("Synchronisation IA terminée");
+    if (showAlert) {
+      alert("Synchronisation IA terminée");
+    }
   } catch (error) {
-    alert(
-      "Erreur synchronisation : " +
-        error.message
-    );
+    if (showAlert) {
+      alert("Erreur synchronisation : " + error.message);
+    }
   } finally {
     setIsRefreshing(false);
   }
@@ -404,19 +400,18 @@ async function runAutomation() {
           })}
         </nav>
 
-        <div className="sidebar-footer">
-          <button
-  onClick={runAutomation}
-  className="refresh-button"
->
-  <RefreshCw
-    size={17}
-    className={isRefreshing ? "spin" : ""}
-  />
-  Synchroniser IA
-</button>
-
-        </div>
+<div className="sidebar-footer">
+  <button
+    onClick={() => runAutomation(true)}
+    className="refresh-button"
+  >
+    <RefreshCw
+      size={17}
+      className={isRefreshing ? "spin" : ""}
+    />
+    Synchroniser IA
+  </button>
+</div>
       </aside>
 
       <main className="main">
