@@ -689,25 +689,32 @@ async function sendTelegramMessage(message) {
     const chatId = process.env.TELEGRAM_CHAT_ID;
 
     if (!token || !chatId) {
-      console.log("Telegram non configuré");
-      return;
+      return {
+        ok: false,
+        error: "Telegram non configuré dans Vercel"
+      };
     }
 
-    await fetch(
+    const response = await fetch(
       `https://api.telegram.org/bot${token}/sendMessage`,
       {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           chat_id: chatId,
-          text: message,
-        }),
+          text: message
+        })
       }
     );
+
+    return await response.json();
   } catch (error) {
-    console.error("Erreur Telegram :", error);
+    return {
+      ok: false,
+      error: error.message
+    };
   }
 }
 
@@ -715,13 +722,14 @@ export default async function handler(req, res) {
   try {
     const action = req.query.action;
 
-    if (action === "telegram-test") {
-  await sendTelegramMessage(
+if (action === "telegram-test") {
+  const result = await sendTelegramMessage(
     "✅ Test Telegram AgentOS réussi"
   );
 
   return res.status(200).json({
     success: true,
+    telegram: result
   });
 }
     
