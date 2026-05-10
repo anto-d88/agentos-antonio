@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/ops?action=check-orders",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/ops?action=check-stock",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/auto-director",
+      "schedule": "0 */2 * * *"
+    }
+  ]
+}
