@@ -8,7 +8,7 @@ export default async function handler(req, res) {
 
     if (!url || !key) {
       return res.status(500).json({
-        error: "Variables manquantes"
+        error: "Variables manquantes !"
       });
     }
 
