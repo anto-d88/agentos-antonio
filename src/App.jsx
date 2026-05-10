@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Brain,
   MessageSquare,
@@ -8,8 +8,24 @@ import {
   ShoppingBag,
   Building2,
   Send,
-  Trash2
+  Trash2,
+  LayoutDashboard,
+  ListTodo,
+  Database,
+  History,
+  AlertTriangle,
+  Activity,
+  Users,
+  RefreshCw
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer
+} from "recharts";
 import { API_URL } from "./config";
 import "./App.css";
 
@@ -31,7 +47,8 @@ const agents = [
     icon: Brain,
     role: "Coordonne les priorités et transforme les idées en plan d’action.",
     prompt: `${baseRules}
-Tu es l’agent chef d’entreprise d’Antonio.`
+Tu es l’agent chef d’entreprise d’Antonio.
+Tu aides à décider, prioriser, organiser et transformer les idées en actions concrètes.`
   },
   {
     id: "marque",
@@ -39,7 +56,8 @@ Tu es l’agent chef d’entreprise d’Antonio.`
     icon: Megaphone,
     role: "Protège le ton, l’identité et le sérieux de La Pause Sandwich.",
     prompt: `${baseRules}
-Tu es l’agent image de marque de La Pause Sandwich.`
+Tu es l’agent image de marque de La Pause Sandwich.
+Tu aides pour slogans, flyers, messages, posts, cohérence visuelle et ton de marque.`
   },
   {
     id: "client",
@@ -61,9 +79,10 @@ RÈGLES SMS / MAIL :
     id: "stock",
     name: "Agent Stock",
     icon: Package,
-    role: "Prévoit les achats et les besoins cuisine.",
+    role: "Prévoit les achats, quantités, ruptures et besoins cuisine.",
     prompt: `${baseRules}
-Tu es l’agent stock de La Pause Sandwich.`
+Tu es l’agent stock de La Pause Sandwich.
+Tu aides à prévoir les achats, les quantités et les risques de rupture.`
   },
   {
     id: "compta",
@@ -71,55 +90,103 @@ Tu es l’agent stock de La Pause Sandwich.`
     icon: Calculator,
     role: "Suit ventes, marges, dépenses et bénéfices.",
     prompt: `${baseRules}
-Tu es l’agent comptabilité d’Antonio.`
+Tu es l’agent comptabilité d’Antonio.
+Tu aides à calculer ventes, dépenses, marges, bénéfices et documents à garder.`
   },
   {
     id: "commandes",
     name: "Agent Commandes",
     icon: ShoppingBag,
-    role: "Organise commandes, préparation et livraison.",
+    role: "Organise commandes, préparation, créneaux et livraison.",
     prompt: `${baseRules}
-Tu es l’agent commandes de La Pause Sandwich.`
+Tu es l’agent commandes de La Pause Sandwich.
+Tu aides à organiser les commandes, les créneaux, la préparation et les livraisons.`
   },
   {
     id: "commercial",
     name: "Agent Développement Commercial",
     icon: Building2,
-    role: "Aide à trouver clients et partenaires.",
+    role: "Aide à trouver clients, call centers, entreprises et partenaires.",
     prompt: `${baseRules}
-Tu es l’agent développement commercial de La Pause Sandwich.`
+Tu es l’agent développement commercial de La Pause Sandwich.
+Tu aides à écrire des messages de prospection, mails entreprises et arguments commerciaux.`
   }
 ];
 
+const tabs = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "agents", label: "Agents", icon: Brain },
+  { id: "tasks", label: "Tâches", icon: ListTodo },
+  { id: "memory", label: "Mémoire", icon: Database },
+  { id: "history", label: "Historique", icon: History }
+];
+
 export default function App() {
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedAgent, setSelectedAgent] = useState(agents[2]);
   const [userInput, setUserInput] = useState("");
   const [history, setHistory] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [memories, setMemories] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [stats, setStats] = useState({
+    conversationsToday: 0,
+    totalConversations: 0,
+    openTasks: 0,
+    memories: 0,
+    activeAgents: 0
+  });
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    loadConversations();
+    loadDashboard();
   }, []);
 
-  async function loadConversations() {
+  async function loadDashboard() {
     try {
-      const res = await fetch(`${API_URL}/api/conversations`);
+      setIsRefreshing(true);
+
+      const res = await fetch(`${API_URL}/api/dashboard`);
       const data = await res.json();
 
-      const formatted = data.map((item) => ({
-        id: item.id,
-        agent: item.agent,
-        userInput: item.userInput || item.user_input,
-        response: item.response,
-        date:
-          item.date ||
-          new Date(item.created_at).toLocaleString("fr-FR")
-      }));
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur dashboard");
+      }
 
-      setHistory(formatted);
+      setStats(
+        data.stats || {
+          conversationsToday: 0,
+          totalConversations: 0,
+          openTasks: 0,
+          memories: 0,
+          activeAgents: 0
+        }
+      );
+
+      setAlerts(data.alerts || []);
+      setTasks(data.tasks || []);
+      setMemories(data.memories || []);
+      setHistory(formatConversations(data.conversations || []));
     } catch (error) {
-      console.error("Erreur chargement :", error);
+      console.error("Erreur chargement dashboard :", error);
+    } finally {
+      setIsRefreshing(false);
     }
+  }
+
+  function formatConversations(items) {
+    return items.map((item) => ({
+      id: item.id,
+      agent: item.agent,
+      userInput: item.userInput || item.user_input,
+      response: item.response,
+      date:
+        item.date ||
+        (item.created_at
+          ? new Date(item.created_at).toLocaleString("fr-FR")
+          : "")
+    }));
   }
 
   async function clearHistory() {
@@ -128,7 +195,7 @@ export default function App() {
         method: "DELETE"
       });
 
-      setHistory([]);
+      await loadDashboard();
     } catch (error) {
       alert("Erreur suppression historique : " + error.message);
     }
@@ -142,6 +209,7 @@ export default function App() {
 
     setUserInput("");
     setIsLoading(true);
+    setActiveTab("agents");
 
     const tempMessage = {
       id: tempId,
@@ -176,26 +244,18 @@ export default function App() {
 
       setHistory((prev) =>
         prev.map((item) =>
-          item.id === tempId
-            ? {
-                ...item,
-                response: responseText
-              }
-            : item
+          item.id === tempId ? { ...item, response: responseText } : item
         )
       );
 
-      await loadConversations();
+      await loadDashboard();
     } catch (error) {
       setHistory((prev) =>
         prev.map((item) =>
           item.id === tempId
             ? {
                 ...item,
-                response:
-                  "ERREUR : " +
-                  error.message +
-                  "\n\nVérifie /api/agent dans Vercel Logs."
+                response: "ERREUR : " + error.message
               }
             : item
         )
@@ -211,98 +271,378 @@ export default function App() {
     }
   }
 
+  const chartData = useMemo(() => {
+    const grouped = {};
+
+    history.forEach((item) => {
+      const day = item.date ? item.date.slice(0, 10) : "Aujourd’hui";
+      grouped[day] = (grouped[day] || 0) + 1;
+    });
+
+    return Object.entries(grouped)
+      .slice(0, 7)
+      .reverse()
+      .map(([day, count]) => ({
+        day,
+        conversations: count
+      }));
+  }, [history]);
+
+  const agentActivity = useMemo(() => {
+    const grouped = {};
+
+    history.forEach((item) => {
+      grouped[item.agent] = (grouped[item.agent] || 0) + 1;
+    });
+
+    return Object.entries(grouped)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+  }, [history]);
+
   return (
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
           <h1>AgentOS</h1>
-          <p className="subtitle">Centre de contrôle IA</p>
+          <p>Centre de contrôle IA</p>
         </div>
 
-        <div className="agent-list">
-          {agents.map((agent) => {
-            const Icon = agent.icon;
+        <nav className="tabs">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
 
             return (
               <button
-                key={agent.id}
-                className={
-                  selectedAgent.id === agent.id ? "agent active" : "agent"
-                }
-                onClick={() => setSelectedAgent(agent)}
+                key={tab.id}
+                className={activeTab === tab.id ? "tab active" : "tab"}
+                onClick={() => setActiveTab(tab.id)}
               >
-                <Icon size={20} />
-                <span>{agent.name}</span>
+                <Icon size={19} />
+                {tab.label}
               </button>
             );
           })}
+        </nav>
+
+        <div className="sidebar-footer">
+          <button onClick={loadDashboard} className="refresh-button">
+            <RefreshCw size={17} className={isRefreshing ? "spin" : ""} />
+            Actualiser
+          </button>
         </div>
       </aside>
 
       <main className="main">
-        <section className="hero">
-          <div>
-            <p className="label">Agent sélectionné</p>
-            <h2>{selectedAgent.name}</h2>
-            <p>{selectedAgent.role}</p>
-          </div>
-        </section>
+        {activeTab === "dashboard" && (
+          <>
+            <Header
+              title="Dashboard entreprise"
+              subtitle="Vue centrale de ton système d’agents IA"
+            />
 
-        <section className="panel">
-          <h3>Mission</h3>
-          <p>{selectedAgent.role}</p>
-        </section>
+            <section className="kpi-grid">
+              <KpiCard
+                title="Conversations aujourd’hui"
+                value={stats.conversationsToday}
+                icon={Activity}
+              />
+              <KpiCard title="Tâches ouvertes" value={stats.openTasks} icon={ListTodo} />
+              <KpiCard title="Mémoires" value={stats.memories} icon={Database} />
+              <KpiCard title="Agents actifs" value={stats.activeAgents} icon={Users} />
+            </section>
 
-        <section className="chatbox">
-          <h3>Nouvelle mission</h3>
+            <section className="dashboard-grid">
+              <div className="panel large">
+                <div className="panel-header">
+                  <h3>Activité récente</h3>
+                  <span>{history.length} échanges</span>
+                </div>
 
-          <textarea
-            placeholder="Écris ta demande..."
-            value={userInput}
-            onChange={(e) => setUserInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-
-          <div className="actions">
-            <button onClick={handleSend} disabled={isLoading}>
-              <Send size={18} />
-              {isLoading ? "Réflexion..." : "Envoyer"}
-            </button>
-
-            <button onClick={clearHistory} className="delete-button">
-              <Trash2 size={18} />
-              Effacer historique
-            </button>
-          </div>
-        </section>
-
-        <section className="history">
-          <h3>Historique</h3>
-
-          {history.length === 0 && (
-            <p className="empty">Aucune conversation enregistrée.</p>
-          )}
-
-          {history.map((item) => (
-            <div className="history-card" key={item.id}>
-              <div className="history-header">
-                <strong>{item.agent}</strong>
-                <small>{item.date}</small>
+                <div className="chart-box">
+                  {chartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={260}>
+                      <LineChart data={chartData}>
+                        <XAxis dataKey="day" />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip />
+                        <Line
+                          type="monotone"
+                          dataKey="conversations"
+                          strokeWidth={3}
+                          dot
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="empty">Pas encore assez de données.</p>
+                  )}
+                </div>
               </div>
 
-              <div className="message-block">
-                <span>Demande</span>
-                <p>{item.userInput}</p>
+              <div className="panel">
+                <div className="panel-header">
+                  <h3>Alertes</h3>
+                  <AlertTriangle size={20} />
+                </div>
+
+                {alerts.length === 0 ? (
+                  <p className="empty">Aucune alerte pour le moment.</p>
+                ) : (
+                  <div className="alert-list">
+                    {alerts.map((alert, index) => (
+                      <div className="alert-card" key={index}>
+                        <strong>{alert.title}</strong>
+                        <p>{alert.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div className="response-block">
-                <span>Réponse</span>
-                <p>{item.response}</p>
+              <div className="panel">
+                <div className="panel-header">
+                  <h3>Agents les plus actifs</h3>
+                </div>
+
+                {agentActivity.length === 0 ? (
+                  <p className="empty">Aucune activité agent.</p>
+                ) : (
+                  <div className="agent-activity">
+                    {agentActivity.map(([agent, count]) => (
+                      <div className="activity-row" key={agent}>
+                        <span>{agent}</span>
+                        <strong>{count}</strong>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+
+              <div className="panel">
+                <div className="panel-header">
+                  <h3>Dernières tâches</h3>
+                </div>
+
+                <TaskList tasks={tasks.slice(0, 5)} />
+              </div>
+            </section>
+          </>
+        )}
+
+        {activeTab === "agents" && (
+          <>
+            <Header
+              title="Agents IA"
+              subtitle="Sélectionne un agent et donne-lui une mission"
+            />
+
+            <section className="agents-layout">
+              <div className="agent-selector">
+                {agents.map((agent) => {
+                  const Icon = agent.icon;
+
+                  return (
+                    <button
+                      key={agent.id}
+                      className={
+                        selectedAgent.id === agent.id
+                          ? "agent-card active"
+                          : "agent-card"
+                      }
+                      onClick={() => setSelectedAgent(agent)}
+                    >
+                      <Icon size={22} />
+                      <div>
+                        <strong>{agent.name}</strong>
+                        <p>{agent.role}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="agent-workspace">
+                <div className="hero-card">
+                  <p className="label">Agent sélectionné</p>
+                  <h2>{selectedAgent.name}</h2>
+                  <p>{selectedAgent.role}</p>
+                </div>
+
+                <div className="panel">
+                  <h3>Nouvelle mission</h3>
+
+                  <textarea
+                    placeholder="Écris ta demande ici..."
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                  />
+
+                  <div className="actions">
+                    <button onClick={handleSend} disabled={isLoading}>
+                      <Send size={18} />
+                      {isLoading ? "Réflexion..." : "Envoyer"}
+                    </button>
+
+                    <span>Ctrl + Entrée pour envoyer</span>
+                  </div>
+                </div>
+
+                <div className="panel">
+                  <div className="panel-header">
+                    <h3>Dernière réponse</h3>
+                  </div>
+
+                  {history.length === 0 ? (
+                    <p className="empty">Aucune réponse pour le moment.</p>
+                  ) : (
+                    <ConversationCard item={history[0]} />
+                  )}
+                </div>
+              </div>
+            </section>
+          </>
+        )}
+
+        {activeTab === "tasks" && (
+          <>
+            <Header
+              title="Tâches inter-agents"
+              subtitle="Actions générées par les agents"
+            />
+
+            <section className="panel">
+              <TaskList tasks={tasks} full />
+            </section>
+          </>
+        )}
+
+        {activeTab === "memory" && (
+          <>
+            <Header
+              title="Mémoire long terme"
+              subtitle="Règles, préférences et informations importantes"
+            />
+
+            <section className="memory-grid">
+              {memories.length === 0 ? (
+                <p className="empty">Aucune mémoire enregistrée.</p>
+              ) : (
+                memories.map((memory) => (
+                  <div className="memory-card" key={memory.id}>
+                    <span>{memory.category || "Général"}</span>
+                    <p>{memory.content}</p>
+                    <small>
+                      {memory.created_at
+                        ? new Date(memory.created_at).toLocaleString("fr-FR")
+                        : ""}
+                    </small>
+                  </div>
+                ))
+              )}
+            </section>
+          </>
+        )}
+
+        {activeTab === "history" && (
+          <>
+            <Header
+              title="Historique"
+              subtitle="Toutes les conversations enregistrées"
+            />
+
+            <div className="history-actions">
+              <button onClick={clearHistory} className="delete-button">
+                <Trash2 size={18} />
+                Effacer historique
+              </button>
             </div>
-          ))}
-        </section>
+
+            <section className="history-list">
+              {history.length === 0 ? (
+                <p className="empty">Aucune conversation enregistrée.</p>
+              ) : (
+                history.map((item) => (
+                  <ConversationCard item={item} key={item.id} />
+                ))
+              )}
+            </section>
+          </>
+        )}
       </main>
+    </div>
+  );
+}
+
+function Header({ title, subtitle }) {
+  return (
+    <header className="page-header">
+      <div>
+        <p className="label">AgentOS</p>
+        <h2>{title}</h2>
+        <p>{subtitle}</p>
+      </div>
+    </header>
+  );
+}
+
+function KpiCard({ title, value, icon: Icon }) {
+  return (
+    <div className="kpi-card">
+      <div className="kpi-icon">
+        <Icon size={24} />
+      </div>
+
+      <div>
+        <span>{title}</span>
+        <strong>{value}</strong>
+      </div>
+    </div>
+  );
+}
+
+function TaskList({ tasks, full = false }) {
+  if (!tasks || tasks.length === 0) {
+    return <p className="empty">Aucune tâche enregistrée.</p>;
+  }
+
+  return (
+    <div className="task-list">
+      {tasks.map((task) => (
+        <div className="task-card" key={task.id}>
+          <div>
+            <span className="status">{task.status || "open"}</span>
+            <strong>{task.title || "Tâche sans titre"}</strong>
+            {full && <p>{task.description}</p>}
+          </div>
+
+          <small>
+            {task.from_agent || "Agent"} → {task.to_agent || "Agent"}
+          </small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ConversationCard({ item }) {
+  return (
+    <div className="conversation-card">
+      <div className="conversation-header">
+        <strong>{item.agent}</strong>
+        <small>{item.date}</small>
+      </div>
+
+      <div className="message-block">
+        <span>Demande</span>
+        <p>{item.userInput}</p>
+      </div>
+
+      <div className="response-block">
+        <span>Réponse</span>
+        <p>{item.response}</p>
+      </div>
     </div>
   );
 }
