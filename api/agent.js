@@ -1,127 +1,121 @@
-const {
-  allowCors,
-  groq,
-  groqModel,
-  getConversations,
-  getMemories,
-  getTasks,
-  saveConversation,
-  saveMemory,
-  detectImportantMemory,
-  detectTasks
-} = require("./_core");
+import OpenAI from "openai";
+import { createClient } from "@supabase/supabase-js";
 
-module.exports = async function handler(req, res) {
-  if (allowCors(req, res)) return;
-
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Méthode non autorisée" });
-  }
-
+export default async function handler(req, res) {
   try {
-    const { agentName, agentPrompt, userMessage } = req.body;
+    if (req.method !== "POST") {
+      return res.status(405).json({
+        error: "Méthode non autorisée"
+      });
+    }
 
-    if (!groq) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const groqApiKey = process.env.GROQ_API_KEY;
+    const groqModel =
+      process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+
+    if (!supabaseUrl || !supabaseKey) {
+      return res.status(500).json({
+        error: "Supabase non configuré"
+      });
+    }
+
+    if (!groqApiKey) {
       return res.status(500).json({
         error: "Groq non configuré"
       });
     }
 
+    const supabase = createClient(
+      supabaseUrl,
+      supabaseKey
+    );
+
+    const groq = new OpenAI({
+      apiKey: groqApiKey,
+      baseURL: "https://api.groq.com/openai/v1"
+    });
+
+    const {
+      agentName,
+      agentPrompt,
+      userMessage
+    } = req.body;
+
     if (!agentPrompt || !userMessage) {
       return res.status(400).json({
-        error: "agentPrompt et userMessage sont obligatoires"
+        error:
+          "agentPrompt et userMessage obligatoires"
       });
     }
 
-    const memories = await getMemories();
-    const conversations = await getConversations();
-    const tasks = await getTasks();
+    const { data: memories } = await supabase
+      .from("agent_memories")
+      .select("*")
+      .limit(20);
 
     const memoryText =
-      memories.map((m) => `- ${m.content}`).join("\n") ||
-      "Aucune mémoire longue durée.";
-
-    const recentText =
-      conversations
-        .slice(0, 5)
-        .map(
-          (c) =>
-            `Agent: ${c.agent}\nDemande: ${c.userInput}\nRéponse: ${c.response}`
-        )
-        .join("\n\n---\n\n") || "Aucun contexte récent.";
-
-    const taskText =
-      tasks
-        .slice(0, 10)
-        .map(
-          (t) =>
-            `- [${t.status}] ${t.title} | de ${t.from_agent} vers ${t.to_agent}`
-        )
-        .join("\n") || "Aucune tâche en cours.";
+      memories?.map((m) => `- ${m.content}`).join("\n") ||
+      "";
 
     const systemPrompt = `
-Tu es ${agentName || "un agent IA"} dans AgentOS, le système d'agents IA d'Antonio.
+Tu es ${agentName || "un agent IA"}.
 
 MISSION :
 ${agentPrompt}
 
-MÉMOIRE LONG TERME :
+MÉMOIRE :
 ${memoryText}
 
-CONTEXTE RÉCENT :
-${recentText}
-
-TÂCHES ACTUELLES :
-${taskText}
-
-RÈGLES ABSOLUES :
-- Réponds toujours en français.
-- Sois clair, utile, concret.
-- Pas de blabla.
-- N'invente jamais un prénom, une heure, un délai, un prix, une adresse ou un détail non donné.
-- Si la demande concerne un SMS ou un mail, donne un message prêt à envoyer.
-- Pour La Pause Sandwich : ton professionnel, humain, simple et chaleureux.
+RÈGLES :
+- Réponds toujours en français
+- Sois concret
+- Pas de blabla
+- Pour les SMS : message prêt à envoyer
+- Ton professionnel et humain
 `;
 
-    const completion = await groq.chat.completions.create({
-      model: groqModel,
-      temperature: 0.4,
-      max_tokens: 900,
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt
-        },
-        {
-          role: "user",
-          content: userMessage
-        }
-      ]
-    });
+    const completion =
+      await groq.chat.completions.create({
+        model: groqModel,
+        temperature: 0.4,
+        max_tokens: 500,
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt
+          },
+          {
+            role: "user",
+            content: userMessage
+          }
+        ]
+      });
 
     const responseText =
-      completion.choices?.[0]?.message?.content?.trim() ||
-      "L’agent n’a pas répondu.";
+      completion.choices?.[0]?.message?.content ||
+      "Pas de réponse";
 
-    await saveConversation({
-      agent: agentName || "Agent inconnu",
-      userInput: userMessage,
-      response: responseText
-    });
+    await supabase
+      .from("agent_conversations")
+      .insert([
+        {
+          agent: agentName,
+          user_input: userMessage,
+          response: responseText
+        }
+      ]);
 
-    if (detectImportantMemory(userMessage)) {
-      await saveMemory(userMessage, agentName || "general");
-    }
-
-    await detectTasks(agentName || "Agent inconnu", userMessage, responseText);
-
-    res.status(200).json({
+    return res.status(200).json({
       response: responseText
     });
   } catch (error) {
-    console.error("Erreur agent :", error);
-    res.status(500).json({
-      error: "Erreur IA côté serveur"
+    console.error(error);
+
+    return res.status(500).json({
+      error: error.message,
+      details: String(error)
     });
   }
-};
+}
