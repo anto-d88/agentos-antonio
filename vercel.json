@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/ops?action=check-orders",
-      "schedule": "0 9 * * * *"
+      "schedule": "0 9 * * *"
     },
     {
       "path": "/api/ops?action=check-stock",
