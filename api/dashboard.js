@@ -7,29 +7,44 @@ export default async function handler(req, res) {
 
     if (!supabaseUrl || !supabaseKey) {
       return res.status(500).json({
-        error: "Variables Supabase manquantes"
+        error: "Variables Supabase AgentOS manquantes"
       });
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { data: conversations } = await supabase
+    const { data: conversations, error: conversationsError } = await supabase
       .from("agent_conversations")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(100);
 
-    const { data: memories } = await supabase
+    if (conversationsError) throw conversationsError;
+
+    const { data: memories, error: memoriesError } = await supabase
       .from("agent_memories")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(50);
 
-    const { data: tasks } = await supabase
+    if (memoriesError) throw memoriesError;
+
+    const { data: tasks, error: tasksError } = await supabase
       .from("agent_tasks")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(100);
+
+    if (tasksError) throw tasksError;
+
+    const { data: alerts, error: alertsError } = await supabase
+      .from("agent_alerts")
+      .select("*")
+      .eq("read", false)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (alertsError) throw alertsError;
 
     const today = new Date().toISOString().slice(0, 10);
 
@@ -38,42 +53,25 @@ export default async function handler(req, res) {
     );
 
     const openTasks = (tasks || []).filter(
-      (task) => task.status === "open"
+      (task) => !task.completed && task.status !== "done"
     );
 
     const activeAgents = new Set(
       (conversations || []).map((item) => item.agent)
     );
 
-    const alerts = [];
-
-    if (openTasks.length > 0) {
-      alerts.push({
-        type: "task",
-        title: `${openTasks.length} tâche(s) ouverte(s)`,
-        message: "Des actions attendent une décision ou un suivi."
-      });
-    }
-
-    if (todayConversations.length === 0) {
-      alerts.push({
-        type: "activity",
-        title: "Aucune activité aujourd’hui",
-        message: "Aucun agent n’a encore été utilisé aujourd’hui."
-      });
-    }
-
     const stats = {
       conversationsToday: todayConversations.length,
       totalConversations: conversations?.length || 0,
       openTasks: openTasks.length,
       memories: memories?.length || 0,
-      activeAgents: activeAgents.size
+      activeAgents: activeAgents.size,
+      unreadAlerts: alerts?.length || 0
     };
 
     return res.status(200).json({
       stats,
-      alerts,
+      alerts: alerts || [],
       conversations: conversations || [],
       memories: memories || [],
       tasks: tasks || []
