@@ -1,6 +1,83 @@
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
+function normalizeStatus(status) {
+  return String(status || "")
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function getOrderGroups(orders = []) {
+  const deliveredOrders = orders.filter((order) =>
+    ["livree", "livre"].includes(normalizeStatus(order.status))
+  );
+
+  const preparingOrders = orders.filter((order) =>
+    ["en_preparation", "en preparation"].includes(normalizeStatus(order.status))
+  );
+
+  const paidOrders = orders.filter((order) =>
+    ["payee", "paye"].includes(normalizeStatus(order.status))
+  );
+
+  const deliveryOrders = orders.filter((order) =>
+    ["en_livraison", "en livraison"].includes(normalizeStatus(order.status))
+  );
+
+  const newOrders = orders.filter((order) =>
+    ["nouvelle", "new"].includes(normalizeStatus(order.status))
+  );
+
+  const canceledOrders = orders.filter((order) =>
+    ["annulee", "annule", "cancelled", "canceled"].includes(
+      normalizeStatus(order.status)
+    )
+  );
+
+  const revenueOrders = orders.filter((order) =>
+    [
+      "payee",
+      "paye",
+      "en_preparation",
+      "en preparation",
+      "en_livraison",
+      "en livraison",
+      "livree",
+      "livre"
+    ].includes(normalizeStatus(order.status))
+  );
+
+  const activeOrders = orders.filter((order) =>
+    [
+      "nouvelle",
+      "new",
+      "payee",
+      "paye",
+      "en_preparation",
+      "en preparation",
+      "en_livraison",
+      "en livraison"
+    ].includes(normalizeStatus(order.status))
+  );
+
+  return {
+    deliveredOrders,
+    preparingOrders,
+    paidOrders,
+    deliveryOrders,
+    newOrders,
+    canceledOrders,
+    revenueOrders,
+    activeOrders
+  };
+}
+
+function getOrderTotal(order) {
+  return Number(order.total_amount || order.total_price || 0);
+}
+
 async function createTask(
   supabase,
   {
@@ -171,16 +248,21 @@ async function getBusinessData() {
       .from("orders")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(50);
 
-    const paidStatuses = ["payée", "payee", "livrée", "livree", "en_preparation"];
+    const {
+      deliveredOrders,
+      preparingOrders,
+      paidOrders,
+      deliveryOrders,
+      newOrders,
+      canceledOrders,
+      revenueOrders,
+      activeOrders
+    } = getOrderGroups(orders || []);
 
-    const paidOrders = (orders || []).filter((order) =>
-      paidStatuses.includes(String(order.status || "").toLowerCase())
-    );
-
-    const revenue = paidOrders.reduce((sum, order) => {
-      return sum + Number(order.total_amount || order.total_price || 0);
+    const revenue = revenueOrders.reduce((sum, order) => {
+      return sum + getOrderTotal(order);
     }, 0);
 
     const productLines = (products || [])
@@ -208,7 +290,7 @@ async function getBusinessData() {
     const recentOrderLines = (orders || [])
       .slice(0, 10)
       .map((order) => {
-        return `- Commande ${order.id} | statut: ${order.status || "non précisé"} | total: ${
+        return `- Commande ${order.id} | statut réel: ${order.status || "non précisé"} | total: ${
           order.total_amount || order.total_price || 0
         }€ | date: ${order.created_at || ""}`;
       })
@@ -219,10 +301,20 @@ async function getBusinessData() {
       text: `
 DONNÉES RÉELLES LA PAUSE SANDWICH :
 
-CHIFFRES :
+CHIFFRES COMMANDES :
 - Commandes récentes analysées : ${orders?.length || 0}
-- Commandes payées/livrées/en préparation : ${paidOrders.length}
-- Chiffre d'affaires estimé sur ces commandes : ${revenue.toFixed(2)}€
+- Commandes nouvelles : ${newOrders.length}
+- Commandes payées : ${paidOrders.length}
+- Commandes en préparation : ${preparingOrders.length}
+- Commandes en livraison : ${deliveryOrders.length}
+- Commandes livrées : ${deliveredOrders.length}
+- Commandes annulées : ${canceledOrders.length}
+- Commandes actives à traiter : ${activeOrders.length}
+- Chiffre d'affaires estimé sur les commandes valides : ${revenue.toFixed(2)}€
+
+IMPORTANT :
+- Une commande "livrée" ne doit jamais être considérée comme "en préparation".
+- Les statuts sont séparés. Ne mélange pas "livrée", "payée" et "en préparation".
 
 STOCK PRODUITS :
 ${productLines || "Aucun produit trouvé."}
@@ -330,6 +422,7 @@ RÈGLES :
 - Quand Antonio demande les chiffres du stock, utilise les données réelles ci-dessus.
 - Quand Antonio demande les commandes ou le chiffre d'affaires, utilise les données réelles ci-dessus.
 - Si une donnée n’est pas disponible, dis clairement qu’elle n’est pas disponible.
+- Ne dis jamais qu'une commande livrée est en préparation.
 - Pour les SMS : message prêt à envoyer uniquement.
 - Pour les mails : message prêt à envoyer uniquement.
 - Ton professionnel, humain et chaleureux.
@@ -337,7 +430,7 @@ RÈGLES :
 
     const completion = await groq.chat.completions.create({
       model: groqModel,
-      temperature: 0.3,
+      temperature: 0.2,
       max_tokens: 900,
       messages: [
         {

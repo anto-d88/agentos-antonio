@@ -1,5 +1,90 @@
 import { createClient } from "@supabase/supabase-js";
 
+function normalizeStatus(status) {
+  return String(status || "")
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function getOrderGroups(orders = []) {
+  const deliveredOrders = orders.filter((order) => {
+    const status = normalizeStatus(order.status);
+    return ["livree", "livre"].includes(status);
+  });
+
+  const preparingOrders = orders.filter((order) => {
+    const status = normalizeStatus(order.status);
+    return ["en_preparation", "en preparation"].includes(status);
+  });
+
+  const paidOrders = orders.filter((order) => {
+    const status = normalizeStatus(order.status);
+    return ["payee", "paye"].includes(status);
+  });
+
+  const deliveryOrders = orders.filter((order) => {
+    const status = normalizeStatus(order.status);
+    return ["en_livraison", "en livraison"].includes(status);
+  });
+
+  const newOrders = orders.filter((order) => {
+    const status = normalizeStatus(order.status);
+    return ["nouvelle", "new"].includes(status);
+  });
+
+  const canceledOrders = orders.filter((order) => {
+    const status = normalizeStatus(order.status);
+    return ["annulee", "annule", "cancelled", "canceled"].includes(status);
+  });
+
+  const revenueOrders = orders.filter((order) => {
+    const status = normalizeStatus(order.status);
+
+    return [
+      "payee",
+      "paye",
+      "en_preparation",
+      "en preparation",
+      "en_livraison",
+      "en livraison",
+      "livree",
+      "livre"
+    ].includes(status);
+  });
+
+  const activeOrders = orders.filter((order) => {
+    const status = normalizeStatus(order.status);
+
+    return [
+      "nouvelle",
+      "new",
+      "payee",
+      "paye",
+      "en_preparation",
+      "en preparation",
+      "en_livraison",
+      "en livraison"
+    ].includes(status);
+  });
+
+  return {
+    deliveredOrders,
+    preparingOrders,
+    paidOrders,
+    deliveryOrders,
+    newOrders,
+    canceledOrders,
+    revenueOrders,
+    activeOrders
+  };
+}
+
+function getOrderTotal(order) {
+  return Number(order.total_amount || order.total_price || 0);
+}
+
 export default async function handler(req, res) {
   try {
     const sandwichUrl = process.env.SANDWICH_SUPABASE_URL;
@@ -28,14 +113,19 @@ export default async function handler(req, res) {
 
     if (productsError) throw productsError;
 
-    const paidStatuses = ["payée", "payee", "livrée", "livree", "en_preparation"];
+    const {
+      deliveredOrders,
+      preparingOrders,
+      paidOrders,
+      deliveryOrders,
+      newOrders,
+      canceledOrders,
+      revenueOrders,
+      activeOrders
+    } = getOrderGroups(orders || []);
 
-    const paidOrders = (orders || []).filter((order) =>
-      paidStatuses.includes(String(order.status || "").toLowerCase())
-    );
-
-    const revenue = paidOrders.reduce((sum, order) => {
-      return sum + Number(order.total_amount || order.total_price || 0);
+    const revenue = revenueOrders.reduce((sum, order) => {
+      return sum + getOrderTotal(order);
     }, 0);
 
     const lowStock = (products || []).filter((product) => {
@@ -46,7 +136,15 @@ export default async function handler(req, res) {
     return res.status(200).json({
       revenue,
       totalOrders: orders?.length || 0,
+
+      deliveredOrders: deliveredOrders.length,
+      preparingOrders: preparingOrders.length,
       paidOrders: paidOrders.length,
+      deliveryOrders: deliveryOrders.length,
+      newOrders: newOrders.length,
+      canceledOrders: canceledOrders.length,
+      activeOrders: activeOrders.length,
+
       lowStock,
       products: products || [],
       recentOrders: orders?.slice(0, 10) || []

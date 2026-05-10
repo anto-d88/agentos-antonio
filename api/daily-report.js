@@ -1,6 +1,83 @@
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
+function normalizeStatus(status) {
+  return String(status || "")
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function getOrderGroups(orders = []) {
+  const deliveredOrders = orders.filter((order) =>
+    ["livree", "livre"].includes(normalizeStatus(order.status))
+  );
+
+  const preparingOrders = orders.filter((order) =>
+    ["en_preparation", "en preparation"].includes(normalizeStatus(order.status))
+  );
+
+  const paidOrders = orders.filter((order) =>
+    ["payee", "paye"].includes(normalizeStatus(order.status))
+  );
+
+  const deliveryOrders = orders.filter((order) =>
+    ["en_livraison", "en livraison"].includes(normalizeStatus(order.status))
+  );
+
+  const newOrders = orders.filter((order) =>
+    ["nouvelle", "new"].includes(normalizeStatus(order.status))
+  );
+
+  const canceledOrders = orders.filter((order) =>
+    ["annulee", "annule", "cancelled", "canceled"].includes(
+      normalizeStatus(order.status)
+    )
+  );
+
+  const revenueOrders = orders.filter((order) =>
+    [
+      "payee",
+      "paye",
+      "en_preparation",
+      "en preparation",
+      "en_livraison",
+      "en livraison",
+      "livree",
+      "livre"
+    ].includes(normalizeStatus(order.status))
+  );
+
+  const activeOrders = orders.filter((order) =>
+    [
+      "nouvelle",
+      "new",
+      "payee",
+      "paye",
+      "en_preparation",
+      "en preparation",
+      "en_livraison",
+      "en livraison"
+    ].includes(normalizeStatus(order.status))
+  );
+
+  return {
+    deliveredOrders,
+    preparingOrders,
+    paidOrders,
+    deliveryOrders,
+    newOrders,
+    canceledOrders,
+    revenueOrders,
+    activeOrders
+  };
+}
+
+function getOrderTotal(order) {
+  return Number(order.total_amount || order.total_price || 0);
+}
+
 export default async function handler(req, res) {
   try {
     const agentosUrl = process.env.SUPABASE_URL;
@@ -64,14 +141,19 @@ export default async function handler(req, res) {
 
     if (tasksError) throw tasksError;
 
-    const paidStatuses = ["payée", "payee", "livrée", "livree", "en_preparation"];
+    const {
+      deliveredOrders,
+      preparingOrders,
+      paidOrders,
+      deliveryOrders,
+      newOrders,
+      canceledOrders,
+      revenueOrders,
+      activeOrders
+    } = getOrderGroups(orders || []);
 
-    const paidOrders = (orders || []).filter((order) =>
-      paidStatuses.includes(String(order.status || "").toLowerCase())
-    );
-
-    const revenue = paidOrders.reduce((sum, order) => {
-      return sum + Number(order.total_amount || order.total_price || 0);
+    const revenue = revenueOrders.reduce((sum, order) => {
+      return sum + getOrderTotal(order);
     }, 0);
 
     const lowStock = (products || []).filter((product) => {
@@ -97,9 +179,9 @@ export default async function handler(req, res) {
       (orders || [])
         .slice(0, 20)
         .map((order) => {
-          return `- Commande ${order.id} | statut: ${order.status || "non précisé"} | total: ${
-            order.total_amount || order.total_price || 0
-          }€ | date: ${order.created_at}`;
+          return `- Commande ${order.id} | statut réel: ${
+            order.status || "non précisé"
+          } | total: ${getOrderTotal(order)}€ | date: ${order.created_at}`;
         })
         .join("\n") || "Aucune commande aujourd’hui.";
 
@@ -107,9 +189,19 @@ export default async function handler(req, res) {
       openTasks
         .slice(0, 20)
         .map((task) => {
-          return `- [${task.priority || "medium"}] ${task.title} | ${task.from_agent} → ${task.to_agent}`;
+          return `- [${task.priority || "medium"}] ${task.title} | ${
+            task.from_agent
+          } → ${task.to_agent}`;
         })
         .join("\n") || "Aucune tâche ouverte.";
+
+    const lowStockText =
+      lowStock
+        .map((product) => {
+          const stock = Number(product.stock_quantity ?? product.stock ?? 0);
+          return `- ${product.name || product.title || "Produit sans nom"} : ${stock}`;
+        })
+        .join("\n") || "Aucun stock faible.";
 
     const prompt = `
 Tu es l'Agent Direction d'Antonio pour La Pause Sandwich.
@@ -119,23 +211,38 @@ Données du jour :
 COMMANDES AUJOURD'HUI :
 ${ordersText}
 
+RÉPARTITION DES STATUTS :
+- Nouvelles : ${newOrders.length}
+- Payées : ${paidOrders.length}
+- En préparation : ${preparingOrders.length}
+- En livraison : ${deliveryOrders.length}
+- Livrées : ${deliveredOrders.length}
+- Annulées : ${canceledOrders.length}
+- Actives à traiter : ${activeOrders.length}
+
 PRODUITS / STOCK :
 ${productsText}
+
+STOCK FAIBLE :
+${lowStockText}
 
 TÂCHES OUVERTES :
 ${tasksText}
 
 CHIFFRES :
 - Commandes totales aujourd'hui : ${orders?.length || 0}
-- Commandes payées/livrées/en préparation : ${paidOrders.length}
 - Chiffre d'affaires estimé du jour : ${revenue.toFixed(2)} €
 - Produits en stock faible : ${lowStock.length}
+- Tâches ouvertes : ${openTasks.length}
+
+RÈGLE IMPORTANTE :
+Une commande avec le statut "livrée" est terminée. Elle ne doit jamais être considérée comme "en préparation".
 
 Ta mission :
 Fais un rapport clair et utile avec :
 1. Résumé de la journée
 2. Chiffre d'affaires
-3. Commandes
+3. Commandes par statut
 4. Stock faible
 5. Problèmes à surveiller
 6. Priorités pour demain
@@ -145,7 +252,7 @@ Réponds en français, de façon directe et actionnable.
 
     const completion = await groq.chat.completions.create({
       model: groqModel,
-      temperature: 0.3,
+      temperature: 0.2,
       max_tokens: 1000,
       messages: [
         {
@@ -163,7 +270,13 @@ Réponds en français, de façon directe et actionnable.
       success: true,
       stats: {
         ordersToday: orders?.length || 0,
+        newOrders: newOrders.length,
         paidOrders: paidOrders.length,
+        preparingOrders: preparingOrders.length,
+        deliveryOrders: deliveryOrders.length,
+        deliveredOrders: deliveredOrders.length,
+        canceledOrders: canceledOrders.length,
+        activeOrders: activeOrders.length,
         revenue,
         lowStock: lowStock.length,
         openTasks: openTasks.length
