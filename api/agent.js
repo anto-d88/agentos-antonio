@@ -12,8 +12,7 @@ export default async function handler(req, res) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const groqApiKey = process.env.GROQ_API_KEY;
-    const groqModel =
-      process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+    const groqModel = "llama-3.1-8b-instant";
 
     if (!supabaseUrl || !supabaseKey) {
       return res.status(500).json({
