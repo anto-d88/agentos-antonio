@@ -1,12 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
 export default async function handler(req, res) {
   try {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      return res.status(500).json({
+        error: "Variables Supabase manquantes dans Vercel"
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
     if (req.method === "GET") {
       const { data, error } = await supabase
         .from("agent_conversations")
@@ -15,7 +21,9 @@ export default async function handler(req, res) {
         .limit(50);
 
       if (error) {
-        throw error;
+        return res.status(500).json({
+          error: error.message
+        });
       }
 
       return res.status(200).json(data || []);
@@ -28,7 +36,9 @@ export default async function handler(req, res) {
         .neq("id", 0);
 
       if (error) {
-        throw error;
+        return res.status(500).json({
+          error: error.message
+        });
       }
 
       return res.status(200).json({
@@ -40,10 +50,8 @@ export default async function handler(req, res) {
       error: "Méthode non autorisée"
     });
   } catch (error) {
-    console.error(error);
-
     return res.status(500).json({
-      error: "Erreur conversations"
+      error: error.message
     });
   }
 }
