@@ -1,5 +1,11 @@
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
+import checkStock from "./check-stock.js";
+
+if (action === "check-stock") {
+  return checkStock(req, res);
+}
+
 
 function normalizeStatus(status) {
   return String(status || "")
