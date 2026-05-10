@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
-import checkStock from "./check-stock.js";
+
 
 
 
