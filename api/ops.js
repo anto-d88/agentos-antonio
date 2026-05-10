@@ -2,9 +2,6 @@ import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 import checkStock from "./check-stock.js";
 
-if (action === "check-stock") {
-  return checkStock(req, res);
-}
 
 
 function normalizeStatus(status) {
@@ -606,6 +603,10 @@ Réponds UNIQUEMENT en JSON valide :
 export default async function handler(req, res) {
   try {
     const action = req.query.action;
+    
+    if (action === "check-stock") {
+    return checkStock(req, res);
+    }
 
     if (action === "business-overview") return businessOverview(req, res);
     if (action === "check-alerts") return checkAlerts(req, res);
