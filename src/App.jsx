@@ -177,6 +177,39 @@ export default function App() {
     }
   }
 
+async function runAutomation() {
+  try {
+    setIsRefreshing(true);
+
+    await fetch(
+      `${API_URL}/api/ops?action=check-orders`
+    );
+
+    await fetch(
+      `${API_URL}/api/ops?action=check-stock`
+    );
+
+    await fetch(
+      `${API_URL}/api/check-alerts`
+    );
+
+    await fetch(
+      `${API_URL}/api/auto-director`
+    );
+
+    await loadDashboard();
+
+    alert("Synchronisation IA terminée");
+  } catch (error) {
+    alert(
+      "Erreur synchronisation : " +
+        error.message
+    );
+  } finally {
+    setIsRefreshing(false);
+  }
+}
+
   function formatConversations(items) {
     return items.map((item) => ({
       id: item.id,
@@ -372,10 +405,17 @@ export default function App() {
         </nav>
 
         <div className="sidebar-footer">
-          <button onClick={loadDashboard} className="refresh-button">
-            <RefreshCw size={17} className={isRefreshing ? "spin" : ""} />
-            Actualiser
-          </button>
+          <button
+  onClick={runAutomation}
+  className="refresh-button"
+>
+  <RefreshCw
+    size={17}
+    className={isRefreshing ? "spin" : ""}
+  />
+  Synchroniser IA
+</button>
+
         </div>
       </aside>
 
