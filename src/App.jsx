@@ -138,6 +138,8 @@ export default function App() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [taskStatusFilter, setTaskStatusFilter] = useState("open");
+  const [taskPriorityFilter, setTaskPriorityFilter] = useState("all");
 
   useEffect(() => {
     loadDashboard();
@@ -326,6 +328,24 @@ export default function App() {
       .slice(0, 5);
   }, [history]);
 
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      const statusMatch =
+        taskStatusFilter === "all" ||
+        task.status === taskStatusFilter ||
+        (taskStatusFilter === "open" &&
+          !task.completed &&
+          task.status !== "done") ||
+        (taskStatusFilter === "done" &&
+          (task.completed || task.status === "done"));
+
+      const priorityMatch =
+        taskPriorityFilter === "all" || task.priority === taskPriorityFilter;
+
+      return statusMatch && priorityMatch;
+    });
+  }, [tasks, taskStatusFilter, taskPriorityFilter]);
+
   return (
     <div className="app">
       <aside className="sidebar">
@@ -373,9 +393,17 @@ export default function App() {
                 value={stats.conversationsToday}
                 icon={Activity}
               />
-              <KpiCard title="Tâches ouvertes" value={stats.openTasks} icon={ListTodo} />
+              <KpiCard
+                title="Tâches ouvertes"
+                value={stats.openTasks}
+                icon={ListTodo}
+              />
               <KpiCard title="Mémoires" value={stats.memories} icon={Database} />
-              <KpiCard title="Agents actifs" value={stats.activeAgents} icon={Users} />
+              <KpiCard
+                title="Agents actifs"
+                value={stats.activeAgents}
+                icon={Users}
+              />
             </section>
 
             <section className="dashboard-grid">
@@ -538,8 +566,48 @@ export default function App() {
               subtitle="Actions générées par les agents"
             />
 
+            <section className="task-filters">
+              <button
+                className={
+                  taskStatusFilter === "open" ? "filter active" : "filter"
+                }
+                onClick={() => setTaskStatusFilter("open")}
+              >
+                Ouvertes
+              </button>
+
+              <button
+                className={
+                  taskStatusFilter === "done" ? "filter active" : "filter"
+                }
+                onClick={() => setTaskStatusFilter("done")}
+              >
+                Terminées
+              </button>
+
+              <button
+                className={
+                  taskStatusFilter === "all" ? "filter active" : "filter"
+                }
+                onClick={() => setTaskStatusFilter("all")}
+              >
+                Toutes
+              </button>
+
+              <select
+                value={taskPriorityFilter}
+                onChange={(e) => setTaskPriorityFilter(e.target.value)}
+              >
+                <option value="all">Toutes priorités</option>
+                <option value="urgent">Urgent</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </section>
+
             <section className="panel">
-              <TaskList tasks={tasks} full onComplete={completeTask} />
+              <TaskList tasks={filteredTasks} full onComplete={completeTask} />
             </section>
           </>
         )}
