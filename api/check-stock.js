@@ -1,77 +1,93 @@
 import { createClient } from "@supabase/supabase-js";
 
-export default async function handler(req, res) {
+export default async function checkStock(req, res) {
   try {
-    const supabase = createClient(
+    const agentos = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY
     );
 
-    const { data: products, error } = await supabase
+    const sandwich = createClient(
+      process.env.SANDWICH_SUPABASE_URL,
+      process.env.SANDWICH_SUPABASE_SERVICE_ROLE_KEY
+    );
+
+    const { data: products, error } = await sandwich
       .from("products")
-      .select("*");
+      .select("*")
+      .order("name", { ascending: true });
 
     if (error) {
       throw error;
     }
 
-    const lowStockProducts = products.filter((p) => {
-      const stock =
-        Number(p.stock || p.stock_quantity || 0);
-
+    const lowStockProducts = (products || []).filter((product) => {
+      const stock = Number(product.stock_quantity ?? product.stock ?? 0);
       return stock <= 5;
     });
 
     let tasksCreated = 0;
+    let alertsCreated = 0;
 
     for (const product of lowStockProducts) {
-      const existingTask = await supabase
+      const stock = Number(product.stock_quantity ?? product.stock ?? 0);
+      const productName = product.name || product.title || "Produit sans nom";
+
+      const title = `Réapprovisionnement ${productName}`;
+
+      const { data: existingTask } = await agentos
         .from("agent_tasks")
         .select("id")
-        .eq("type", "stock_alert")
-        .eq("status", "OPEN")
-        .ilike("title", `%${product.name}%`)
-        .maybeSingle();
+        .eq("title", title)
+        .eq("status", "open")
+        .limit(1);
 
-      if (existingTask.data) {
-        continue;
-      }
-
-      await supabase
-        .from("agent_tasks")
-        .insert([
+      if (!existingTask || existingTask.length === 0) {
+        await agentos.from("agent_tasks").insert([
           {
-            title: `Réapprovisionnement ${product.name}`,
-            description:
-              `Stock faible détecté : ${product.name} ` +
-              `(stock actuel : ${product.stock})`,
+            title,
+            description: `Stock faible détecté : ${productName} (stock actuel : ${stock})`,
             type: "stock_alert",
-            priority: "HIGH",
-            status: "OPEN",
+            priority: stock === 0 ? "urgent" : "high",
+            status: "open",
+            completed: false,
             from_agent: "Agent Stock",
             to_agent: "Agent Chef d’entreprise"
           }
         ]);
 
-      await supabase
+        tasksCreated++;
+      }
+
+      const alertMessage = `${productName} presque en rupture (stock : ${stock})`;
+
+      const { data: existingAlert } = await agentos
         .from("agent_alerts")
-        .insert([
+        .select("id")
+        .eq("message", alertMessage)
+        .eq("read", false)
+        .limit(1);
+
+      if (!existingAlert || existingAlert.length === 0) {
+        await agentos.from("agent_alerts").insert([
           {
             title: "Stock faible",
-            message:
-              `${product.name} presque en rupture ` +
-              `(stock : ${product.stock})`,
-            severity: "HIGH"
+            message: alertMessage,
+            priority: stock === 0 ? "urgent" : "high",
+            read: false
           }
         ]);
 
-      tasksCreated++;
+        alertsCreated++;
+      }
     }
 
     return res.status(200).json({
       success: true,
+      productsChecked: products?.length || 0,
       lowStockProducts: lowStockProducts.length,
-      tasksCreated
+      tasksCreated,
+      alertsCreated
     });
   } catch (error) {
     return res.status(500).json({
