@@ -775,9 +775,135 @@ async function checkNewOrders(req, res) {
   });
 }
 
+async function updateAlert(req, res) {
+  const { agentos } = getClients();
+
+  const { id, action } = req.body;
+
+  if (!id || !action) {
+    return res.status(400).json({
+      error: "id et action obligatoires"
+    });
+  }
+
+  const updates = {};
+
+  if (action === "read") {
+    updates.read = true;
+    updates.status = "read";
+  }
+
+  if (action === "important") {
+    updates.important = true;
+  }
+
+  if (action === "complete") {
+    updates.completed = true;
+    updates.status = "completed";
+    updates.read = true;
+  }
+
+  if (action === "delete") {
+    updates.deleted = true;
+    updates.status = "deleted";
+    updates.read = true;
+  }
+
+  const { data, error } = await agentos
+    .from("agent_alerts")
+    .update(updates)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return res.status(200).json({
+    success: true,
+    alert: data
+  });
+}
+
+async function addToPlanning(req, res) {
+  const { agentos } = getClients();
+
+  const {
+    title,
+    description,
+    planned_date,
+    planned_time,
+    priority,
+    source_type,
+    source_id
+  } = req.body;
+
+  if (!title || !planned_date) {
+    return res.status(400).json({
+      error: "title et planned_date obligatoires"
+    });
+  }
+
+  const { data: planning, error } = await agentos
+    .from("agent_planning")
+    .insert([
+      {
+        title,
+        description,
+        planned_date,
+        planned_time,
+        priority: priority || "medium",
+        source_type: source_type || null,
+        source_id: source_id || null,
+        status: "planned",
+        completed: false
+      }
+    ])
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  if (source_type === "alert" && source_id) {
+    await agentos
+      .from("agent_alerts")
+      .update({
+        planned: true,
+        status: "planned",
+        read: true
+      })
+      .eq("id", source_id);
+  }
+
+  return res.status(200).json({
+    success: true,
+    planning
+  });
+}
+
+async function getPlanning(req, res) {
+  const { agentos } = getClients();
+
+  const { data, error } = await agentos
+    .from("agent_planning")
+    .select("*")
+    .order("planned_date", { ascending: true })
+    .order("planned_time", { ascending: true });
+
+  if (error) throw error;
+
+  return res.status(200).json({
+    success: true,
+    planning: data || []
+  });
+}
+
 export default async function handler(req, res) {
   try {
     const action = req.query.action;
+
+    if (action === "alert-update") return updateAlert(req, res);
+if (action === "add-to-planning") return addToPlanning(req, res);
+if (action === "get-planning") return getPlanning(req, res);
 
     if (action === "check-new-orders") return checkNewOrders(req, res);
 
