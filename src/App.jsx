@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { API_URL } from "./config";
 import {
   Brain,
   MessageSquare,
@@ -11,7 +10,7 @@ import {
   Send,
   Trash2
 } from "lucide-react";
-
+import { API_URL } from "./config";
 import "./App.css";
 
 const baseRules = `
@@ -19,11 +18,10 @@ RÈGLES ABSOLUES :
 - Réponds toujours en français.
 - Réponds directement à la demande.
 - Ne fais pas de long discours.
-- Ne donne pas d'explication inutile après le résultat.
-- N'invente jamais de prénom, d'heure, de durée, de prix ou de détail non donné.
+- N'invente jamais de prénom, d'heure, de délai, de prix ou de détail non donné.
 - Si Antonio demande un SMS, donne uniquement le SMS prêt à envoyer.
 - Si Antonio demande un mail, donne uniquement le mail prêt à envoyer.
-- Style : professionnel, humain, simple, chaleureux, efficace.
+- Ton professionnel, humain, simple, chaleureux et efficace.
 `;
 
 const agents = [
@@ -33,8 +31,7 @@ const agents = [
     icon: Brain,
     role: "Coordonne les priorités et transforme les idées en plan d’action.",
     prompt: `${baseRules}
-Tu es l’agent chef d’entreprise d’Antonio.
-Tu aides à organiser les projets et prendre les bonnes décisions.`
+Tu es l’agent chef d’entreprise d’Antonio.`
   },
   {
     id: "marque",
@@ -42,8 +39,7 @@ Tu aides à organiser les projets et prendre les bonnes décisions.`
     icon: Megaphone,
     role: "Protège le ton, l’identité et le sérieux de La Pause Sandwich.",
     prompt: `${baseRules}
-Tu es l’agent image de marque de La Pause Sandwich.
-Tu aides pour slogans, flyers, communication et cohérence de marque.`
+Tu es l’agent image de marque de La Pause Sandwich.`
   },
   {
     id: "client",
@@ -53,12 +49,13 @@ Tu aides pour slogans, flyers, communication et cohérence de marque.`
     prompt: `${baseRules}
 Tu es l’agent communication client de La Pause Sandwich.
 
-RÈGLES :
-- Commence toujours poliment.
+RÈGLES SMS / MAIL :
+- Commence toujours par une formule polie.
+- Si le prénom est donné, utilise-le.
 - Ne jamais inventer de prénom.
+- Ne jamais inventer de délai.
 - Termine toujours par : _La Pause Sandwich
-- SMS court et professionnel.
-- Pas d’explication après le message.`
+- Donne uniquement le message prêt à envoyer.`
   },
   {
     id: "stock",
@@ -66,8 +63,7 @@ RÈGLES :
     icon: Package,
     role: "Prévoit les achats et les besoins cuisine.",
     prompt: `${baseRules}
-Tu es l’agent stock de La Pause Sandwich.
-Tu aides à prévoir achats, quantités et ruptures.`
+Tu es l’agent stock de La Pause Sandwich.`
   },
   {
     id: "compta",
@@ -96,7 +92,7 @@ Tu es l’agent développement commercial de La Pause Sandwich.`
 ];
 
 export default function App() {
-  const [selectedAgent, setSelectedAgent] = useState(agents[0]);
+  const [selectedAgent, setSelectedAgent] = useState(agents[2]);
   const [userInput, setUserInput] = useState("");
   const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -107,24 +103,34 @@ export default function App() {
 
   async function loadConversations() {
     try {
-      const res = await fetch("${API_URL}/api/conversations");
+      const res = await fetch(`${API_URL}/api/conversations`);
       const data = await res.json();
 
-      setHistory(data);
+      const formatted = data.map((item) => ({
+        id: item.id,
+        agent: item.agent,
+        userInput: item.userInput || item.user_input,
+        response: item.response,
+        date:
+          item.date ||
+          new Date(item.created_at).toLocaleString("fr-FR")
+      }));
+
+      setHistory(formatted);
     } catch (error) {
-      console.error("Erreur chargement conversations :", error);
+      console.error("Erreur chargement :", error);
     }
   }
 
   async function clearHistory() {
     try {
-      await fetch("${API_URL}/api/conversations", {
+      await fetch(`${API_URL}/api/conversations`, {
         method: "DELETE"
       });
 
       setHistory([]);
     } catch (error) {
-      console.error("Erreur suppression historique :", error);
+      alert("Erreur suppression historique : " + error.message);
     }
   }
 
@@ -132,22 +138,23 @@ export default function App() {
     if (!userInput.trim() || isLoading) return;
 
     const currentInput = userInput;
+    const tempId = Date.now();
 
     setUserInput("");
     setIsLoading(true);
 
     const tempMessage = {
-      id: Date.now(),
+      id: tempId,
       agent: selectedAgent.name,
       userInput: currentInput,
       response: "Réflexion en cours...",
-      date: new Date().toLocaleString()
+      date: new Date().toLocaleString("fr-FR")
     };
 
     setHistory((prev) => [tempMessage, ...prev]);
 
     try {
-      const res = await fetch("${API_URL}/api/agent", {
+      const res = await fetch(`${API_URL}/api/agent`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -161,9 +168,38 @@ export default function App() {
 
       const data = await res.json();
 
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur API inconnue");
+      }
+
+      const responseText = data.response || "Pas de réponse reçue.";
+
+      setHistory((prev) =>
+        prev.map((item) =>
+          item.id === tempId
+            ? {
+                ...item,
+                response: responseText
+              }
+            : item
+        )
+      );
+
       await loadConversations();
     } catch (error) {
-      console.error(error);
+      setHistory((prev) =>
+        prev.map((item) =>
+          item.id === tempId
+            ? {
+                ...item,
+                response:
+                  "ERREUR : " +
+                  error.message +
+                  "\n\nVérifie /api/agent dans Vercel Logs."
+              }
+            : item
+        )
+      );
     } finally {
       setIsLoading(false);
     }
@@ -233,10 +269,7 @@ export default function App() {
               {isLoading ? "Réflexion..." : "Envoyer"}
             </button>
 
-            <button
-              onClick={clearHistory}
-              className="delete-button"
-            >
+            <button onClick={clearHistory} className="delete-button">
               <Trash2 size={18} />
               Effacer historique
             </button>
