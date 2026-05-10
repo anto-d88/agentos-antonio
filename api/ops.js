@@ -718,9 +718,60 @@ async function sendTelegramMessage(message) {
   }
 }
 
+async function checkNewOrders(req, res) {
+  const envError = checkEnv();
+  if (envError) return res.status(500).json({ error: envError });
+
+  const { sandwich } = getClients();
+
+  const { data: orders, error } = await sandwich
+    .from("orders")
+    .select("*")
+    .eq("notification_sent", false)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) throw error;
+
+  let sent = 0;
+
+  for (const order of orders || []) {
+    await sendTelegramMessage(
+      `🛒 Nouvelle commande La Pause Sandwich\n\n👤 Client : ${
+        order.customer_name || "Non précisé"
+      }\n📞 Téléphone : ${
+        order.customer_phone || "Non précisé"
+      }\n🏢 Entreprise : ${
+        order.company_name || "Non précisé"
+      }\n💶 Total : ${
+        order.total_amount || order.total_price || 0
+      }€\n🕒 Créneau : ${
+        order.delivery_slot_label || order.delivery_slot || "Non précisé"
+      }\n📍 Adresse : ${
+        order.delivery_address || "Non précisée"
+      }`
+    );
+
+    await sandwich
+      .from("orders")
+      .update({ notification_sent: true })
+      .eq("id", order.id);
+
+    sent++;
+  }
+
+  return res.status(200).json({
+    success: true,
+    ordersChecked: orders?.length || 0,
+    notificationsSent: sent
+  });
+}
+
 export default async function handler(req, res) {
   try {
     const action = req.query.action;
+
+    if (action === "check-new-orders") return checkNewOrders(req, res);
 
 if (action === "telegram-test") {
   const result = await sendTelegramMessage(
