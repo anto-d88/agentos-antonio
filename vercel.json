@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/ops?action=check-stock",
-      "schedule": "*/30 9 * * *"
+      "schedule": "30 9 * * *"
     },
     {
       "path": "/api/ops?action=auto-director",
