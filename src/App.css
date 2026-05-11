@@ -1379,3 +1379,96 @@ textarea:focus {
     width: 100%;
   }
 }
+
+/* =========================
+   LOGS IA
+========================= */
+
+.logs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.log-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+
+  padding: 20px;
+
+  border-radius: 24px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,0.06),
+      rgba(255,255,255,0.03)
+    ),
+    var(--panel);
+
+  border: 1px solid var(--border);
+
+  box-shadow: var(--shadow);
+}
+
+.log-left {
+  display: flex;
+  gap: 18px;
+}
+
+.log-icon {
+  width: 48px;
+  height: 48px;
+
+  border-radius: 16px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(250,204,21,0.18),
+      rgba(245,158,11,0.18)
+    );
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.log-content {
+  flex: 1;
+}
+
+.log-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.log-content strong {
+  font-size: 16px;
+}
+
+.log-content p {
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+
+.log-content small {
+  color: var(--muted);
+}
+
+.log-status {
+  display: flex;
+  align-items: center;
+}
+
+.log-status.success {
+  color: #22c55e;
+}
+
+.log-status.warning {
+  color: #f59e0b;
+}

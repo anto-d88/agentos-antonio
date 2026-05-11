@@ -1,14 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import TaskList from "./components/TaskList";
-import ConversationCard from "./components/ConversationCard";
-import AlertCard from "./components/AlertCard";
-import PlanningList from "./components/PlanningList";
-import Sidebar from "./components/Sidebar";
-import Header from "./components/Header";
-import KpiCard from "./components/KpiCard";
-import DashboardPage from "./pages/DashboardPage";
-import Topbar from "./components/Topbar";
 import {
   Brain,
   MessageSquare,
@@ -19,33 +10,23 @@ import {
   Building2,
   Send,
   Trash2,
-  LayoutDashboard,
-  ListTodo,
-  Database,
-  History,
-  AlertTriangle,
-  Activity,
-  Users,
-  RefreshCw,
-  Inbox,
-  CalendarDays,
-  Star,
-  CheckCircle2,
-  Eye,
-  Archive,
   Plus,
   X
 } from "lucide-react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer
-} from "recharts";
+
 import { API_URL } from "./config";
 import "./App.css";
+
+import Sidebar from "./components/Sidebar";
+import Header from "./components/Header";
+import Topbar from "./components/Topbar";
+import TaskList from "./components/TaskList";
+import ConversationCard from "./components/ConversationCard";
+import AlertCard from "./components/AlertCard";
+import PlanningList from "./components/PlanningList";
+
+import DashboardPage from "./pages/DashboardPage";
+import LogsPage from "./pages/LogsPage";
 
 const baseRules = `
 RÈGLES ABSOLUES :
@@ -131,7 +112,6 @@ Tu aides à écrire des messages de prospection, mails entreprises et arguments 
   }
 ];
 
-
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedAgent, setSelectedAgent] = useState(agents[2]);
@@ -142,6 +122,7 @@ export default function App() {
   const [memories, setMemories] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [planning, setPlanning] = useState([]);
+  const [logs, setLogs] = useState([]);
 
   const [stats, setStats] = useState({
     conversationsToday: 0,
@@ -168,80 +149,50 @@ export default function App() {
     planned_time: "",
     priority: "medium"
   });
-const [knownAlertIds, setKnownAlertIds] = useState([]);
-const [alertsInitialized, setAlertsInitialized] = useState(false);
-const notificationSound = new Audio(
-  "/sounds/notification.mp3"
-);
-useEffect(() => {
-  runAutomation(false);
 
-  const interval = setInterval(async () => {
-    try {
-      await loadDashboard();
-      await loadPlanning();
+  const [knownAlertIds, setKnownAlertIds] = useState([]);
+  const [alertsInitialized, setAlertsInitialized] = useState(false);
 
-      // check auto agents
-      await fetch(
-        `${API_URL}/api/ops?action=check-new-orders`
-      );
+  useEffect(() => {
+    runAutomation(false);
 
-      await fetch(
-        `${API_URL}/api/ops?action=check-stock`
-      );
+    const interval = setInterval(async () => {
+      try {
+        await loadDashboard();
+        await loadPlanning();
 
-      await fetch(
-        `${API_URL}/api/ops?action=check-orders`
-      );
+        await fetch(`${API_URL}/api/ops?action=check-new-orders`);
+        await fetch(`${API_URL}/api/ops?action=check-stock`);
+        await fetch(`${API_URL}/api/ops?action=check-orders`);
+      } catch (error) {
+        console.error("Erreur polling temps réel :", error);
+      }
+    }, 15000);
 
-    } catch (error) {
-      console.error(
-        "Erreur polling temps réel :",
-        error
-      );
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!alerts.length) return;
+
+    if (!alertsInitialized) {
+      setKnownAlertIds(alerts.map((alert) => alert.id));
+      setAlertsInitialized(true);
+      return;
     }
-  }, 15000);
 
-  return () => clearInterval(interval);
-}, []);
- useEffect(() => {
-  if (!alerts.length) return;
-
-  // premier chargement
-  if (!alertsInitialized) {
-    setKnownAlertIds(
-      alerts.map((a) => a.id)
+    const newAlerts = alerts.filter(
+      (alert) => !knownAlertIds.includes(alert.id) && !alert.read
     );
 
-    setAlertsInitialized(true);
+    const latestAlerts = newAlerts.slice(0, 10);
 
-    return;
-  }
+    latestAlerts.forEach((alert) => {
+      toast(`🚨 ${alert.title}\n${alert.message}`);
+    });
 
-  // nouvelles alertes uniquement
-  const newAlerts = alerts.filter(
-    (alert) =>
-      !knownAlertIds.includes(alert.id) &&
-      !alert.read
-  );
-
-  // limiter à 10 max
-  const latestAlerts = newAlerts.slice(0, 10);
-
-latestAlerts.forEach((alert) => {
-  toast(
-    `🚨 ${alert.title}\n${alert.message}`
-  );
-
-  notificationSound.currentTime = 0;
-
-  notificationSound.play().catch(() => {});
-});
-
-  setKnownAlertIds(
-    alerts.map((a) => a.id)
-  );
-}, [alerts, alertsInitialized, knownAlertIds]);
+    setKnownAlertIds(alerts.map((alert) => alert.id));
+  }, [alerts, alertsInitialized, knownAlertIds]);
 
   async function loadDashboard() {
     try {
@@ -268,6 +219,7 @@ latestAlerts.forEach((alert) => {
       setAlerts(data.alerts || []);
       setTasks(data.tasks || []);
       setMemories(data.memories || []);
+      setLogs(data.logs || []);
       setHistory(formatConversations(data.conversations || []));
     } catch (error) {
       console.error("Erreur chargement dashboard :", error);
@@ -576,28 +528,29 @@ latestAlerts.forEach((alert) => {
 
   return (
     <div className="app">
-<Sidebar
-  activeTab={activeTab}
-  setActiveTab={setActiveTab}
-  stats={stats}
-  runAutomation={runAutomation}
-  isRefreshing={isRefreshing}
-/>
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        stats={stats}
+        runAutomation={runAutomation}
+        isRefreshing={isRefreshing}
+      />
 
       <main className="main">
-  <Topbar alerts={alerts} />
+        <Topbar alerts={alerts} />
+
         {activeTab === "dashboard" && (
-  <DashboardPage
-    stats={stats}
-    history={history}
-    alerts={alerts}
-    planningToday={planningToday}
-    chartData={chartData}
-    agentActivity={agentActivity}
-    updateAlert={updateAlert}
-    openPlanningModal={openPlanningModal}
-  />
-)}
+          <DashboardPage
+            stats={stats}
+            history={history}
+            alerts={alerts}
+            planningToday={planningToday}
+            chartData={chartData}
+            agentActivity={agentActivity}
+            updateAlert={updateAlert}
+            openPlanningModal={openPlanningModal}
+          />
+        )}
 
         {activeTab === "inbox" && (
           <>
@@ -700,6 +653,7 @@ latestAlerts.forEach((alert) => {
                       onClick={() => setSelectedAgent(agent)}
                     >
                       <Icon size={22} />
+
                       <div>
                         <strong>{agent.name}</strong>
                         <p>{agent.role}</p>
@@ -805,6 +759,8 @@ latestAlerts.forEach((alert) => {
           </>
         )}
 
+        {activeTab === "logs" && <LogsPage logs={logs} />}
+
         {activeTab === "memory" && (
           <>
             <Header
@@ -868,7 +824,11 @@ latestAlerts.forEach((alert) => {
                 <h3>Ajouter une action</h3>
               </div>
 
-              <button type="button" className="icon-button" onClick={closePlanningModal}>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={closePlanningModal}
+              >
                 <X size={20} />
               </button>
             </div>
@@ -950,7 +910,11 @@ latestAlerts.forEach((alert) => {
             </label>
 
             <div className="modal-actions">
-              <button type="button" className="delete-button" onClick={closePlanningModal}>
+              <button
+                type="button"
+                className="delete-button"
+                onClick={closePlanningModal}
+              >
                 Annuler
               </button>
 

@@ -32,6 +32,11 @@ const tabs = [
     icon: Brain
   },
   {
+  id: "logs",
+  label: "Logs IA",
+  icon: Activity
+  },
+  {
     id: "tasks",
     label: "Tâches",
     icon: ListTodo
