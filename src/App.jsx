@@ -170,6 +170,9 @@ export default function App() {
   });
 const [knownAlertIds, setKnownAlertIds] = useState([]);
 const [alertsInitialized, setAlertsInitialized] = useState(false);
+const notificationSound = new Audio(
+  "/sounds/notification.mp3"
+);
 useEffect(() => {
   runAutomation(false);
 
@@ -225,11 +228,15 @@ useEffect(() => {
   // limiter à 10 max
   const latestAlerts = newAlerts.slice(0, 10);
 
-  latestAlerts.forEach((alert) => {
-    toast(
-      `🚨 ${alert.title}\n${alert.message}`
-    );
-  });
+latestAlerts.forEach((alert) => {
+  toast(
+    `🚨 ${alert.title}\n${alert.message}`
+  );
+
+  notificationSound.currentTime = 0;
+
+  notificationSound.play().catch(() => {});
+});
 
   setKnownAlertIds(
     alerts.map((a) => a.id)
