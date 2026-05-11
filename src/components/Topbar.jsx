@@ -38,7 +38,7 @@ export default function Topbar({
         <div className="topbar-status">
           <Wifi size={15} />
 
-          <span>Système actif</span>
+          <span>Live sync active</span>
         </div>
 
         <div className="topbar-time">

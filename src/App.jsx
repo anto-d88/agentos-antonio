@@ -169,16 +169,37 @@ export default function App() {
     priority: "medium"
   });
 const [knownAlertIds, setKnownAlertIds] = useState([]);
-  useEffect(() => {
-    runAutomation(false);
+useEffect(() => {
+  runAutomation(false);
 
-    const interval = setInterval(() => {
-      loadDashboard();
-      loadPlanning();
-    }, 60000);
+  const interval = setInterval(async () => {
+    try {
+      await loadDashboard();
+      await loadPlanning();
 
-    return () => clearInterval(interval);
-  }, []);
+      // check auto agents
+      await fetch(
+        `${API_URL}/api/ops?action=check-new-orders`
+      );
+
+      await fetch(
+        `${API_URL}/api/ops?action=check-stock`
+      );
+
+      await fetch(
+        `${API_URL}/api/ops?action=check-orders`
+      );
+
+    } catch (error) {
+      console.error(
+        "Erreur polling temps réel :",
+        error
+      );
+    }
+  }, 15000);
+
+  return () => clearInterval(interval);
+}, []);
   useEffect(() => {
   if (!alerts.length) return;
 
