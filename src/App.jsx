@@ -169,6 +169,7 @@ export default function App() {
     priority: "medium"
   });
 const [knownAlertIds, setKnownAlertIds] = useState([]);
+const [alertsInitialized, setAlertsInitialized] = useState(false);
 useEffect(() => {
   runAutomation(false);
 
@@ -200,16 +201,31 @@ useEffect(() => {
 
   return () => clearInterval(interval);
 }, []);
-  useEffect(() => {
+ useEffect(() => {
   if (!alerts.length) return;
 
+  // premier chargement
+  if (!alertsInitialized) {
+    setKnownAlertIds(
+      alerts.map((a) => a.id)
+    );
+
+    setAlertsInitialized(true);
+
+    return;
+  }
+
+  // nouvelles alertes uniquement
   const newAlerts = alerts.filter(
     (alert) =>
       !knownAlertIds.includes(alert.id) &&
       !alert.read
   );
 
-  newAlerts.forEach((alert) => {
+  // limiter à 10 max
+  const latestAlerts = newAlerts.slice(0, 10);
+
+  latestAlerts.forEach((alert) => {
     toast(
       `🚨 ${alert.title}\n${alert.message}`
     );
@@ -218,7 +234,7 @@ useEffect(() => {
   setKnownAlertIds(
     alerts.map((a) => a.id)
   );
-}, [alerts]);
+}, [alerts, alertsInitialized, knownAlertIds]);
 
   async function loadDashboard() {
     try {
