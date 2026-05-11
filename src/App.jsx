@@ -16,7 +16,15 @@ import {
   AlertTriangle,
   Activity,
   Users,
-  RefreshCw
+  RefreshCw,
+  Inbox,
+  CalendarDays,
+  Star,
+  CheckCircle2,
+  Eye,
+  Archive,
+  Plus,
+  X
 } from "lucide-react";
 import {
   LineChart,
@@ -115,6 +123,8 @@ Tu aides à écrire des messages de prospection, mails entreprises et arguments 
 
 const tabs = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "inbox", label: "Inbox IA", icon: Inbox },
+  { id: "planning", label: "Planning", icon: CalendarDays },
   { id: "agents", label: "Agents", icon: Brain },
   { id: "tasks", label: "Tâches", icon: ListTodo },
   { id: "memory", label: "Mémoire", icon: Database },
@@ -125,51 +135,49 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedAgent, setSelectedAgent] = useState(agents[2]);
   const [userInput, setUserInput] = useState("");
+
   const [history, setHistory] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [memories, setMemories] = useState([]);
   const [alerts, setAlerts] = useState([]);
+  const [planning, setPlanning] = useState([]);
+
   const [stats, setStats] = useState({
     conversationsToday: 0,
     totalConversations: 0,
     openTasks: 0,
     memories: 0,
-    activeAgents: 0
+    activeAgents: 0,
+    unreadAlerts: 0
   });
+
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
   const [taskStatusFilter, setTaskStatusFilter] = useState("open");
   const [taskPriorityFilter, setTaskPriorityFilter] = useState("all");
+  const [inboxFilter, setInboxFilter] = useState("unread");
 
-useEffect(() => {
-  runAutomation(false);
+  const [planningModalOpen, setPlanningModalOpen] = useState(false);
+  const [planningSourceAlert, setPlanningSourceAlert] = useState(null);
+  const [planningForm, setPlanningForm] = useState({
+    title: "",
+    description: "",
+    planned_date: "",
+    planned_time: "",
+    priority: "medium"
+  });
 
-  const interval = setInterval(() => {
-    loadDashboard();
-  }, 60000);
+  useEffect(() => {
+    runAutomation(false);
 
-  const updateAlert = async (id, action) => {
-  try {
-    await fetch("/api/ops?action=alert-update", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        id,
-        action
-      })
-    });
+    const interval = setInterval(() => {
+      loadDashboard();
+      loadPlanning();
+    }, 60000);
 
-    loadAlerts();
-
-  } catch (err) {
-    console.error(err);
-  }
-};
-
-  return () => clearInterval(interval);
-}, []);
+    return () => clearInterval(interval);
+  }, []);
 
   async function loadDashboard() {
     try {
@@ -188,7 +196,8 @@ useEffect(() => {
           totalConversations: 0,
           openTasks: 0,
           memories: 0,
-          activeAgents: 0
+          activeAgents: 0,
+          unreadAlerts: 0
         }
       );
 
@@ -203,28 +212,42 @@ useEffect(() => {
     }
   }
 
-async function runAutomation(showAlert = true) {
-  try {
-    setIsRefreshing(true);
+  async function loadPlanning() {
+    try {
+      const res = await fetch(`${API_URL}/api/ops?action=get-planning`);
+      const data = await res.json();
 
-    await fetch(`${API_URL}/api/ops?action=check-orders`);
-    await fetch(`${API_URL}/api/ops?action=check-stock`);
-    await fetch(`${API_URL}/api/ops?action=check-alerts`);
-    await fetch(`${API_URL}/api/ops?action=auto-director`);
-
-    await loadDashboard();
-
-    if (showAlert) {
-      alert("Synchronisation IA terminée");
+      if (res.ok) {
+        setPlanning(data.planning || []);
+      }
+    } catch (error) {
+      console.error("Erreur chargement planning :", error);
     }
-  } catch (error) {
-    if (showAlert) {
-      alert("Erreur synchronisation : " + error.message);
-    }
-  } finally {
-    setIsRefreshing(false);
   }
-}
+
+  async function runAutomation(showAlert = true) {
+    try {
+      setIsRefreshing(true);
+
+      await fetch(`${API_URL}/api/ops?action=check-new-orders`);
+      await fetch(`${API_URL}/api/ops?action=check-stock`);
+      await fetch(`${API_URL}/api/ops?action=check-orders`);
+      await fetch(`${API_URL}/api/ops?action=auto-director`);
+
+      await loadDashboard();
+      await loadPlanning();
+
+      if (showAlert) {
+        alert("Synchronisation IA terminée");
+      }
+    } catch (error) {
+      if (showAlert) {
+        alert("Erreur synchronisation : " + error.message);
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
 
   function formatConversations(items) {
     return items.map((item) => ({
@@ -275,6 +298,81 @@ async function runAutomation(showAlert = true) {
       await loadDashboard();
     } catch (error) {
       alert("Erreur tâche : " + error.message);
+    }
+  }
+
+  async function updateAlert(id, action) {
+    try {
+      const res = await fetch(`${API_URL}/api/ops?action=alert-update`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          id,
+          action
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur mise à jour alerte");
+      }
+
+      await loadDashboard();
+    } catch (error) {
+      alert("Erreur alerte : " + error.message);
+    }
+  }
+
+  function openPlanningModal(alert) {
+    const today = new Date().toISOString().slice(0, 10);
+
+    setPlanningSourceAlert(alert);
+    setPlanningForm({
+      title: alert.title || "Action à planifier",
+      description: alert.message || "",
+      planned_date: today,
+      planned_time: "",
+      priority: alert.priority || "medium"
+    });
+    setPlanningModalOpen(true);
+  }
+
+  function closePlanningModal() {
+    setPlanningModalOpen(false);
+    setPlanningSourceAlert(null);
+  }
+
+  async function submitPlanning(e) {
+    e.preventDefault();
+
+    try {
+      const res = await fetch(`${API_URL}/api/ops?action=add-to-planning`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          ...planningForm,
+          source_type: planningSourceAlert ? "alert" : "manual",
+          source_id: planningSourceAlert?.id || null
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur planning");
+      }
+
+      closePlanningModal();
+      await loadDashboard();
+      await loadPlanning();
+      setActiveTab("planning");
+    } catch (error) {
+      alert("Erreur ajout planning : " + error.message);
     }
   }
 
@@ -395,12 +493,29 @@ async function runAutomation(showAlert = true) {
     });
   }, [tasks, taskStatusFilter, taskPriorityFilter]);
 
+  const filteredAlerts = useMemo(() => {
+    return alerts.filter((alert) => {
+      if (inboxFilter === "all") return !alert.deleted;
+      if (inboxFilter === "unread") return !alert.read && !alert.deleted;
+      if (inboxFilter === "important") return alert.important && !alert.deleted;
+      if (inboxFilter === "planned") return alert.planned && !alert.deleted;
+      if (inboxFilter === "completed") return alert.completed && !alert.deleted;
+      if (inboxFilter === "deleted") return alert.deleted;
+      return true;
+    });
+  }, [alerts, inboxFilter]);
+
+  const planningToday = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return planning.filter((item) => item.planned_date === today);
+  }, [planning]);
+
   return (
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
           <h1>AgentOS</h1>
-          <p>Centre de contrôle IA</p>
+          <p>Cockpit IA opérationnel</p>
         </div>
 
         <nav className="tabs">
@@ -420,26 +535,23 @@ async function runAutomation(showAlert = true) {
           })}
         </nav>
 
-<div className="sidebar-footer">
-  <button
-    onClick={() => runAutomation(true)}
-    className="refresh-button"
-  >
-    <RefreshCw
-      size={17}
-      className={isRefreshing ? "spin" : ""}
-    />
-    Synchroniser IA
-  </button>
-</div>
+        <div className="sidebar-footer">
+          <button
+            onClick={() => runAutomation(true)}
+            className="refresh-button"
+          >
+            <RefreshCw size={17} className={isRefreshing ? "spin" : ""} />
+            Synchroniser IA
+          </button>
+        </div>
       </aside>
 
       <main className="main">
         {activeTab === "dashboard" && (
           <>
             <Header
-              title="Dashboard entreprise"
-              subtitle="Vue centrale de ton système d’agents IA"
+              title="Cockpit opérationnel"
+              subtitle="Vue centrale de tes agents IA, alertes, tâches, planning et automatisations."
             />
 
             <section className="kpi-grid">
@@ -453,7 +565,11 @@ async function runAutomation(showAlert = true) {
                 value={stats.openTasks}
                 icon={ListTodo}
               />
-              <KpiCard title="Mémoires" value={stats.memories} icon={Database} />
+              <KpiCard
+                title="Alertes non lues"
+                value={stats.unreadAlerts || alerts.filter((a) => !a.read).length}
+                icon={Inbox}
+              />
               <KpiCard
                 title="Agents actifs"
                 value={stats.activeAgents}
@@ -464,7 +580,7 @@ async function runAutomation(showAlert = true) {
             <section className="dashboard-grid">
               <div className="panel large">
                 <div className="panel-header">
-                  <h3>Activité récente</h3>
+                  <h3>Activité IA récente</h3>
                   <span>{history.length} échanges</span>
                 </div>
 
@@ -491,7 +607,7 @@ async function runAutomation(showAlert = true) {
 
               <div className="panel">
                 <div className="panel-header">
-                  <h3>Alertes</h3>
+                  <h3>Inbox urgente</h3>
                   <AlertTriangle size={20} />
                 </div>
 
@@ -499,49 +615,14 @@ async function runAutomation(showAlert = true) {
                   <p className="empty">Aucune alerte pour le moment.</p>
                 ) : (
                   <div className="alert-list">
-                    {alerts.map((alert, index) => (
-                      <div className="alert-card" key={index}>
-                        <strong>{alert.title}</strong>
-                        <p>{alert.message}</p>
-                        <div className="flex gap-2 mt-3 flex-wrap">
-
-  <button
-    onClick={() => updateAlert(alert.id, "read")}
-    className="bg-blue-500 text-white px-2 py-1 rounded"
-  >
-    ✓ Lu
-  </button>
-
-  <button
-    onClick={() => updateAlert(alert.id, "important")}
-    className="bg-yellow-500 text-black px-2 py-1 rounded"
-  >
-    ⭐ Important
-  </button>
-
-  <button
-    onClick={() => openPlanningModal(alert)}
-    className="bg-purple-500 text-white px-2 py-1 rounded"
-  >
-    📅 Planning
-  </button>
-
-  <button
-    onClick={() => updateAlert(alert.id, "complete")}
-    className="bg-green-600 text-white px-2 py-1 rounded"
-  >
-    ✅ Terminé
-  </button>
-
-  <button
-    onClick={() => updateAlert(alert.id, "delete")}
-    className="bg-red-600 text-white px-2 py-1 rounded"
-  >
-    🗑 Supprimer
-  </button>
-
-</div>
-                      </div>
+                    {alerts.slice(0, 5).map((alert) => (
+                      <AlertCard
+                        key={alert.id}
+                        alert={alert}
+                        onUpdate={updateAlert}
+                        onPlan={openPlanningModal}
+                        compact
+                      />
                     ))}
                   </div>
                 )}
@@ -568,11 +649,90 @@ async function runAutomation(showAlert = true) {
 
               <div className="panel">
                 <div className="panel-header">
-                  <h3>Dernières tâches</h3>
+                  <h3>Planning du jour</h3>
+                  <CalendarDays size={20} />
                 </div>
 
-                <TaskList tasks={tasks.slice(0, 5)} onComplete={completeTask} />
+                <PlanningList items={planningToday.slice(0, 5)} compact />
               </div>
+            </section>
+          </>
+        )}
+
+        {activeTab === "inbox" && (
+          <>
+            <Header
+              title="Inbox IA"
+              subtitle="Toutes les alertes importantes comme une boîte mail : lu, important, terminé, supprimé ou ajouté au planning."
+            />
+
+            <section className="task-filters">
+              {[
+                ["unread", "Non lus"],
+                ["important", "Importants"],
+                ["planned", "Planifiés"],
+                ["completed", "Terminés"],
+                ["deleted", "Supprimés"],
+                ["all", "Tous"]
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  className={inboxFilter === value ? "filter active" : "filter"}
+                  onClick={() => setInboxFilter(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </section>
+
+            <section className="inbox-list">
+              {filteredAlerts.length === 0 ? (
+                <div className="panel">
+                  <p className="empty">Aucune alerte dans cette catégorie.</p>
+                </div>
+              ) : (
+                filteredAlerts.map((alert) => (
+                  <AlertCard
+                    key={alert.id}
+                    alert={alert}
+                    onUpdate={updateAlert}
+                    onPlan={openPlanningModal}
+                  />
+                ))
+              )}
+            </section>
+          </>
+        )}
+
+        {activeTab === "planning" && (
+          <>
+            <Header
+              title="Planning opérationnel"
+              subtitle="Les actions planifiées depuis les alertes, agents et décisions importantes."
+            />
+
+            <section className="planning-toolbar">
+              <button
+                className="refresh-button"
+                onClick={() => {
+                  setPlanningSourceAlert(null);
+                  setPlanningForm({
+                    title: "",
+                    description: "",
+                    planned_date: new Date().toISOString().slice(0, 10),
+                    planned_time: "",
+                    priority: "medium"
+                  });
+                  setPlanningModalOpen(true);
+                }}
+              >
+                <Plus size={18} />
+                Ajouter au planning
+              </button>
+            </section>
+
+            <section className="planning-grid">
+              <PlanningList items={planning} />
             </section>
           </>
         )}
@@ -581,7 +741,7 @@ async function runAutomation(showAlert = true) {
           <>
             <Header
               title="Agents IA"
-              subtitle="Sélectionne un agent et donne-lui une mission"
+              subtitle="Sélectionne un agent et donne-lui une mission."
             />
 
             <section className="agents-layout">
@@ -656,7 +816,7 @@ async function runAutomation(showAlert = true) {
           <>
             <Header
               title="Tâches inter-agents"
-              subtitle="Actions générées par les agents"
+              subtitle="Actions générées automatiquement par les agents."
             />
 
             <section className="task-filters">
@@ -709,7 +869,7 @@ async function runAutomation(showAlert = true) {
           <>
             <Header
               title="Mémoire long terme"
-              subtitle="Règles, préférences et informations importantes"
+              subtitle="Règles, préférences et informations importantes."
             />
 
             <section className="memory-grid">
@@ -736,7 +896,7 @@ async function runAutomation(showAlert = true) {
           <>
             <Header
               title="Historique"
-              subtitle="Toutes les conversations enregistrées"
+              subtitle="Toutes les conversations enregistrées."
             />
 
             <div className="history-actions">
@@ -758,6 +918,109 @@ async function runAutomation(showAlert = true) {
           </>
         )}
       </main>
+
+      {planningModalOpen && (
+        <div className="modal-backdrop">
+          <form className="planning-modal" onSubmit={submitPlanning}>
+            <div className="modal-header">
+              <div>
+                <p className="label">Planning</p>
+                <h3>Ajouter une action</h3>
+              </div>
+
+              <button type="button" className="icon-button" onClick={closePlanningModal}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <label>
+              Titre
+              <input
+                value={planningForm.title}
+                onChange={(e) =>
+                  setPlanningForm((prev) => ({
+                    ...prev,
+                    title: e.target.value
+                  }))
+                }
+                required
+              />
+            </label>
+
+            <label>
+              Description
+              <textarea
+                value={planningForm.description}
+                onChange={(e) =>
+                  setPlanningForm((prev) => ({
+                    ...prev,
+                    description: e.target.value
+                  }))
+                }
+              />
+            </label>
+
+            <div className="form-row">
+              <label>
+                Date
+                <input
+                  type="date"
+                  value={planningForm.planned_date}
+                  onChange={(e) =>
+                    setPlanningForm((prev) => ({
+                      ...prev,
+                      planned_date: e.target.value
+                    }))
+                  }
+                  required
+                />
+              </label>
+
+              <label>
+                Heure
+                <input
+                  type="time"
+                  value={planningForm.planned_time || ""}
+                  onChange={(e) =>
+                    setPlanningForm((prev) => ({
+                      ...prev,
+                      planned_time: e.target.value
+                    }))
+                  }
+                />
+              </label>
+            </div>
+
+            <label>
+              Priorité
+              <select
+                value={planningForm.priority}
+                onChange={(e) =>
+                  setPlanningForm((prev) => ({
+                    ...prev,
+                    priority: e.target.value
+                  }))
+                }
+              >
+                <option value="urgent">Urgent</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </label>
+
+            <div className="modal-actions">
+              <button type="button" className="delete-button" onClick={closePlanningModal}>
+                Annuler
+              </button>
+
+              <button type="submit" className="refresh-button">
+                Ajouter au planning
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
@@ -785,6 +1048,79 @@ function KpiCard({ title, value, icon: Icon }) {
         <span>{title}</span>
         <strong>{value}</strong>
       </div>
+    </div>
+  );
+}
+
+function AlertCard({ alert, onUpdate, onPlan, compact = false }) {
+  return (
+    <div className={`alert-card ${alert.important ? "important" : ""}`}>
+      <div className="inbox-card-header">
+        <div>
+          <strong>{alert.title || "Alerte"}</strong>
+          <p>{alert.message}</p>
+        </div>
+
+        <span className={`priority ${alert.priority || "medium"}`}>
+          {alert.priority || "medium"}
+        </span>
+      </div>
+
+      {!compact && (
+        <div className="inbox-actions">
+          <button onClick={() => onUpdate(alert.id, "read")}>
+            <Eye size={15} />
+            Lu
+          </button>
+
+          <button onClick={() => onUpdate(alert.id, "important")}>
+            <Star size={15} />
+            Important
+          </button>
+
+          <button onClick={() => onPlan(alert)}>
+            <CalendarDays size={15} />
+            Planning
+          </button>
+
+          <button onClick={() => onUpdate(alert.id, "complete")}>
+            <CheckCircle2 size={15} />
+            Terminé
+          </button>
+
+          <button onClick={() => onUpdate(alert.id, "delete")}>
+            <Archive size={15} />
+            Supprimer
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlanningList({ items, compact = false }) {
+  if (!items || items.length === 0) {
+    return <p className="empty">Aucune action planifiée.</p>;
+  }
+
+  return (
+    <div className="planning-list">
+      {items.map((item) => (
+        <div className="planning-card" key={item.id}>
+          <div>
+            <span className={`priority ${item.priority || "medium"}`}>
+              {item.priority || "medium"}
+            </span>
+            <strong>{item.title}</strong>
+            {!compact && <p>{item.description}</p>}
+          </div>
+
+          <small>
+            {item.planned_date}
+            {item.planned_time ? ` · ${item.planned_time}` : ""}
+          </small>
+        </div>
+      ))}
     </div>
   );
 }

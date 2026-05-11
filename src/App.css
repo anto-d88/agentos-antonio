@@ -948,3 +948,254 @@ textarea:focus {
     text-align: left;
   }
 }
+
+/* =========================
+   INBOX IA
+========================= */
+
+.inbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.inbox-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.inbox-card-header strong {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 17px;
+}
+
+.inbox-card-header p {
+  color: #dbeafe;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.alert-card.important {
+  border-color: rgba(250, 204, 21, 0.45);
+  box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.12);
+}
+
+.inbox-actions {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.inbox-actions button {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  transition: 0.18s ease;
+}
+
+.inbox-actions button:hover {
+  background: rgba(255, 255, 255, 0.09);
+  transform: translateY(-1px);
+}
+
+/* =========================
+   PLANNING
+========================= */
+
+.planning-toolbar {
+  margin-bottom: 22px;
+}
+
+.planning-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.planning-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.planning-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.07),
+      rgba(255, 255, 255, 0.03)
+    ),
+    var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 18px;
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow);
+  transition: 0.18s ease;
+}
+
+.planning-card:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.planning-card strong {
+  display: block;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  font-size: 17px;
+}
+
+.planning-card p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.planning-card small {
+  color: var(--muted);
+  min-width: 130px;
+  text-align: right;
+}
+
+/* =========================
+   MODAL
+========================= */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.78);
+  backdrop-filter: blur(10px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+  padding: 20px;
+}
+
+.planning-modal {
+  width: 100%;
+  max-width: 700px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0.04)
+    ),
+    rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 30px;
+  padding: 28px;
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 26px;
+}
+
+.modal-header h3 {
+  margin-top: 10px;
+  font-size: 30px;
+  letter-spacing: -1px;
+}
+
+.icon-button {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.icon-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.planning-modal label {
+  display: block;
+  margin-bottom: 18px;
+  color: #e2e8f0;
+  font-weight: 700;
+}
+
+.planning-modal input,
+.planning-modal select {
+  width: 100%;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  background: rgba(2, 6, 23, 0.65);
+  color: var(--text);
+  border-radius: 16px;
+  padding: 14px;
+  font-size: 15px;
+}
+
+.planning-modal input:focus,
+.planning-modal select:focus {
+  outline: none;
+  border-color: rgba(250, 204, 21, 0.4);
+  box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.08);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.modal-actions {
+  margin-top: 28px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 760px) {
+  .planning-card,
+  .inbox-card-header,
+  .modal-header,
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .planning-card small {
+    text-align: left;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .planning-modal {
+    padding: 22px;
+  }
+}
