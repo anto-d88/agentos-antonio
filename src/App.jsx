@@ -6,6 +6,7 @@ import PlanningList from "./components/PlanningList";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import KpiCard from "./components/KpiCard";
+import DashboardPage from "./pages/DashboardPage";
 import {
   Brain,
   MessageSquare,
@@ -520,116 +521,17 @@ export default function App() {
 
       <main className="main">
         {activeTab === "dashboard" && (
-          <>
-            <Header
-              title="Cockpit opérationnel"
-              subtitle="Vue centrale de tes agents IA, alertes, tâches, planning et automatisations."
-            />
-
-            <section className="kpi-grid">
-              <KpiCard
-                title="Conversations aujourd’hui"
-                value={stats.conversationsToday}
-                icon={Activity}
-              />
-              <KpiCard
-                title="Tâches ouvertes"
-                value={stats.openTasks}
-                icon={ListTodo}
-              />
-              <KpiCard
-                title="Alertes non lues"
-                value={stats.unreadAlerts || alerts.filter((a) => !a.read).length}
-                icon={Inbox}
-              />
-              <KpiCard
-                title="Agents actifs"
-                value={stats.activeAgents}
-                icon={Users}
-              />
-            </section>
-
-            <section className="dashboard-grid">
-              <div className="panel large">
-                <div className="panel-header">
-                  <h3>Activité IA récente</h3>
-                  <span>{history.length} échanges</span>
-                </div>
-
-                <div className="chart-box">
-                  {chartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={260}>
-                      <LineChart data={chartData}>
-                        <XAxis dataKey="day" />
-                        <YAxis allowDecimals={false} />
-                        <Tooltip />
-                        <Line
-                          type="monotone"
-                          dataKey="conversations"
-                          strokeWidth={3}
-                          dot
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <p className="empty">Pas encore assez de données.</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="panel">
-                <div className="panel-header">
-                  <h3>Inbox urgente</h3>
-                  <AlertTriangle size={20} />
-                </div>
-
-                {alerts.length === 0 ? (
-                  <p className="empty">Aucune alerte pour le moment.</p>
-                ) : (
-                  <div className="alert-list">
-                    {alerts.slice(0, 5).map((alert) => (
-                      <AlertCard
-                        key={alert.id}
-                        alert={alert}
-                        onUpdate={updateAlert}
-                        onPlan={openPlanningModal}
-                        compact
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="panel">
-                <div className="panel-header">
-                  <h3>Agents les plus actifs</h3>
-                </div>
-
-                {agentActivity.length === 0 ? (
-                  <p className="empty">Aucune activité agent.</p>
-                ) : (
-                  <div className="agent-activity">
-                    {agentActivity.map(([agent, count]) => (
-                      <div className="activity-row" key={agent}>
-                        <span>{agent}</span>
-                        <strong>{count}</strong>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="panel">
-                <div className="panel-header">
-                  <h3>Planning du jour</h3>
-                  <CalendarDays size={20} />
-                </div>
-
-                <PlanningList items={planningToday.slice(0, 5)} compact />
-              </div>
-            </section>
-          </>
-        )}
+  <DashboardPage
+    stats={stats}
+    history={history}
+    alerts={alerts}
+    planningToday={planningToday}
+    chartData={chartData}
+    agentActivity={agentActivity}
+    updateAlert={updateAlert}
+    openPlanningModal={openPlanningModal}
+  />
+)}
 
         {activeTab === "inbox" && (
           <>
