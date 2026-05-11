@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import Sidebar from "./components/Sidebar";
+import Header from "./components/Header";
+import KpiCard from "./components/KpiCard";
 import {
   Brain,
   MessageSquare,
@@ -121,15 +124,6 @@ Tu aides à écrire des messages de prospection, mails entreprises et arguments 
   }
 ];
 
-const tabs = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "inbox", label: "Inbox IA", icon: Inbox },
-  { id: "planning", label: "Planning", icon: CalendarDays },
-  { id: "agents", label: "Agents", icon: Brain },
-  { id: "tasks", label: "Tâches", icon: ListTodo },
-  { id: "memory", label: "Mémoire", icon: Database },
-  { id: "history", label: "Historique", icon: History }
-];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -512,39 +506,13 @@ export default function App() {
 
   return (
     <div className="app">
-      <aside className="sidebar">
-        <div className="brand">
-          <h1>AgentOS</h1>
-          <p>Cockpit IA opérationnel</p>
-        </div>
-
-        <nav className="tabs">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-
-            return (
-              <button
-                key={tab.id}
-                className={activeTab === tab.id ? "tab active" : "tab"}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                <Icon size={19} />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="sidebar-footer">
-          <button
-            onClick={() => runAutomation(true)}
-            className="refresh-button"
-          >
-            <RefreshCw size={17} className={isRefreshing ? "spin" : ""} />
-            Synchroniser IA
-          </button>
-        </div>
-      </aside>
+<Sidebar
+  activeTab={activeTab}
+  setActiveTab={setActiveTab}
+  stats={stats}
+  runAutomation={runAutomation}
+  isRefreshing={isRefreshing}
+/>
 
       <main className="main">
         {activeTab === "dashboard" && (
@@ -1021,33 +989,6 @@ export default function App() {
           </form>
         </div>
       )}
-    </div>
-  );
-}
-
-function Header({ title, subtitle }) {
-  return (
-    <header className="page-header">
-      <div>
-        <p className="label">AgentOS</p>
-        <h2>{title}</h2>
-        <p>{subtitle}</p>
-      </div>
-    </header>
-  );
-}
-
-function KpiCard({ title, value, icon: Icon }) {
-  return (
-    <div className="kpi-card">
-      <div className="kpi-icon">
-        <Icon size={24} />
-      </div>
-
-      <div>
-        <span>{title}</span>
-        <strong>{value}</strong>
-      </div>
     </div>
   );
 }
