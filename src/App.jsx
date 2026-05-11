@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import TaskList from "./components/TaskList";
 import ConversationCard from "./components/ConversationCard";
 import AlertCard from "./components/AlertCard";
@@ -167,7 +168,7 @@ export default function App() {
     planned_time: "",
     priority: "medium"
   });
-
+const [knownAlertIds, setKnownAlertIds] = useState([]);
   useEffect(() => {
     runAutomation(false);
 
@@ -178,6 +179,25 @@ export default function App() {
 
     return () => clearInterval(interval);
   }, []);
+  useEffect(() => {
+  if (!alerts.length) return;
+
+  const newAlerts = alerts.filter(
+    (alert) =>
+      !knownAlertIds.includes(alert.id) &&
+      !alert.read
+  );
+
+  newAlerts.forEach((alert) => {
+    toast(
+      `🚨 ${alert.title}\n${alert.message}`
+    );
+  });
+
+  setKnownAlertIds(
+    alerts.map((a) => a.id)
+  );
+}, [alerts]);
 
   async function loadDashboard() {
     try {
