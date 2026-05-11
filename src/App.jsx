@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import AlertCard from "./components/AlertCard";
+import PlanningList from "./components/PlanningList";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import KpiCard from "./components/KpiCard";
@@ -989,79 +991,6 @@ export default function App() {
           </form>
         </div>
       )}
-    </div>
-  );
-}
-
-function AlertCard({ alert, onUpdate, onPlan, compact = false }) {
-  return (
-    <div className={`alert-card ${alert.important ? "important" : ""}`}>
-      <div className="inbox-card-header">
-        <div>
-          <strong>{alert.title || "Alerte"}</strong>
-          <p>{alert.message}</p>
-        </div>
-
-        <span className={`priority ${alert.priority || "medium"}`}>
-          {alert.priority || "medium"}
-        </span>
-      </div>
-
-      {!compact && (
-        <div className="inbox-actions">
-          <button onClick={() => onUpdate(alert.id, "read")}>
-            <Eye size={15} />
-            Lu
-          </button>
-
-          <button onClick={() => onUpdate(alert.id, "important")}>
-            <Star size={15} />
-            Important
-          </button>
-
-          <button onClick={() => onPlan(alert)}>
-            <CalendarDays size={15} />
-            Planning
-          </button>
-
-          <button onClick={() => onUpdate(alert.id, "complete")}>
-            <CheckCircle2 size={15} />
-            Terminé
-          </button>
-
-          <button onClick={() => onUpdate(alert.id, "delete")}>
-            <Archive size={15} />
-            Supprimer
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PlanningList({ items, compact = false }) {
-  if (!items || items.length === 0) {
-    return <p className="empty">Aucune action planifiée.</p>;
-  }
-
-  return (
-    <div className="planning-list">
-      {items.map((item) => (
-        <div className="planning-card" key={item.id}>
-          <div>
-            <span className={`priority ${item.priority || "medium"}`}>
-              {item.priority || "medium"}
-            </span>
-            <strong>{item.title}</strong>
-            {!compact && <p>{item.description}</p>}
-          </div>
-
-          <small>
-            {item.planned_date}
-            {item.planned_time ? ` · ${item.planned_time}` : ""}
-          </small>
-        </div>
-      ))}
     </div>
   );
 }
