@@ -344,7 +344,7 @@ async function checkStock(req, res) {
   let resetProducts = 0;
 
   for (const product of products || []) {
-    const stock = Number(product.stock_quantity ?? product.stock ?? 0);
+    const stock = Number(product.stock_quantity || 0);
     const threshold = Number(product.low_stock_threshold ?? 5);
     const productName = product.name || product.title || "Produit sans nom";
     const alertSent = Boolean(product.stock_alert_sent);
