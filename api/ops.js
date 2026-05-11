@@ -1,9 +1,6 @@
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
-
-
-
 function normalizeStatus(status) {
   return String(status || "")
     .toLowerCase()
@@ -115,6 +112,41 @@ function checkEnv() {
   return null;
 }
 
+async function sendTelegramMessage(message) {
+  try {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+
+    if (!token || !chatId) {
+      return {
+        ok: false,
+        error: "Telegram non configuré dans Vercel"
+      };
+    }
+
+    const response = await fetch(
+      `https://api.telegram.org/bot${token}/sendMessage`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message
+        })
+      }
+    );
+
+    return await response.json();
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.message
+    };
+  }
+}
+
 async function businessOverview(req, res) {
   const envError = checkEnv();
   if (envError) return res.status(500).json({ error: envError });
@@ -144,7 +176,8 @@ async function businessOverview(req, res) {
 
   const lowStock = (products || []).filter((product) => {
     const stock = Number(product.stock_quantity ?? product.stock ?? 0);
-    return stock <= 3;
+    const threshold = Number(product.low_stock_threshold ?? 5);
+    return stock <= threshold;
   });
 
   return res.status(200).json({
@@ -178,7 +211,8 @@ async function checkAlerts(req, res) {
 
   const lowStock = (products || []).filter((product) => {
     const stock = Number(product.stock_quantity ?? product.stock ?? 0);
-    return stock <= 3;
+    const threshold = Number(product.low_stock_threshold ?? 5);
+    return stock <= threshold;
   });
 
   const createdAlerts = [];
@@ -303,32 +337,30 @@ async function checkStock(req, res) {
 
   if (error) throw error;
 
-  const lowStockProducts = (products || []).filter((product) => {
-    const stock = Number(product.stock_quantity ?? product.stock ?? 0);
-    return stock <= 5;
-  });
-
+  let lowStockProducts = 0;
   let tasksCreated = 0;
   let alertsCreated = 0;
+  let telegramSent = 0;
+  let resetProducts = 0;
 
-  for (const product of lowStockProducts) {
+  for (const product of products || []) {
     const stock = Number(product.stock_quantity ?? product.stock ?? 0);
+    const threshold = Number(product.low_stock_threshold ?? 5);
     const productName = product.name || product.title || "Produit sans nom";
+    const alertSent = Boolean(product.stock_alert_sent);
 
-    const title = `Réapprovisionnement ${productName}`;
+    if (stock <= threshold) {
+      lowStockProducts++;
+    }
 
-    const { data: existingTask } = await agentos
-      .from("agent_tasks")
-      .select("id")
-      .eq("title", title)
-      .eq("status", "open")
-      .limit(1);
+    if (stock <= threshold && !alertSent) {
+      const title = `Réapprovisionnement ${productName}`;
+      const alertMessage = `${productName} presque en rupture (stock : ${stock})`;
 
-    if (!existingTask || existingTask.length === 0) {
       await agentos.from("agent_tasks").insert([
         {
           title,
-          description: `Stock faible détecté : ${productName} (stock actuel : ${stock})`,
+          description: `Stock faible détecté : ${productName} (stock actuel : ${stock}, seuil : ${threshold})`,
           type: "stock_alert",
           priority: stock === 0 ? "urgent" : "high",
           status: "open",
@@ -339,45 +371,58 @@ async function checkStock(req, res) {
       ]);
 
       tasksCreated++;
-    }
 
-    const alertMessage = `${productName} presque en rupture (stock : ${stock})`;
-
-    const { data: existingAlert } = await agentos
-      .from("agent_alerts")
-      .select("id")
-      .eq("message", alertMessage)
-      .eq("read", false)
-      .limit(1);
-
-    if (!existingAlert || existingAlert.length === 0) {
-await agentos.from("agent_alerts").insert([
-  {
-    title: "Stock faible",
-    message: alertMessage,
-    priority: stock === 0 ? "urgent" : "high",
-    read: false
-  }
-]);
-
-await sendTelegramMessage(
-  `🚨 Stock faible La Pause Sandwich\n\n📦 Produit : ${productName}\n📉 Stock actuel : ${stock}\n⚠️ Priorité : ${
-    stock === 0 ? "URGENT" : "HIGH"
-  }`
-);
-
-alertsCreated++;
+      await agentos.from("agent_alerts").insert([
+        {
+          title: "Stock faible",
+          message: alertMessage,
+          priority: stock === 0 ? "urgent" : "high",
+          read: false
+        }
+      ]);
 
       alertsCreated++;
+
+      const telegramResult = await sendTelegramMessage(
+        `🚨 Stock faible La Pause Sandwich\n\n📦 Produit : ${productName}\n📉 Stock actuel : ${stock}\n🎯 Seuil : ${threshold}\n⚠️ Priorité : ${
+          stock === 0 ? "URGENT" : "HIGH"
+        }`
+      );
+
+      if (telegramResult?.ok) {
+        telegramSent++;
+      }
+
+      await sandwich
+        .from("products")
+        .update({
+          stock_alert_sent: true,
+          stock_alert_sent_at: new Date().toISOString(),
+          last_stock_alert_level: stock
+        })
+        .eq("id", product.id);
+    }
+
+    if (stock > threshold && alertSent) {
+      await sandwich
+        .from("products")
+        .update({
+          stock_alert_sent: false
+        })
+        .eq("id", product.id);
+
+      resetProducts++;
     }
   }
 
   return res.status(200).json({
     success: true,
     productsChecked: products?.length || 0,
-    lowStockProducts: lowStockProducts.length,
+    lowStockProducts,
     tasksCreated,
-    alertsCreated
+    alertsCreated,
+    telegramSent,
+    resetProducts
   });
 }
 
@@ -425,7 +470,8 @@ async function dailyReport(req, res) {
 
   const lowStock = (products || []).filter((product) => {
     const stock = Number(product.stock_quantity ?? product.stock ?? 0);
-    return stock <= 3;
+    const threshold = Number(product.low_stock_threshold ?? 5);
+    return stock <= threshold;
   });
 
   const openTasks = (tasks || []).filter(
@@ -570,7 +616,8 @@ async function autoDirector(req, res) {
 
   const lowStock = (products || []).filter((product) => {
     const stock = Number(product.stock_quantity ?? product.stock ?? 0);
-    return stock <= 3;
+    const threshold = Number(product.low_stock_threshold ?? 5);
+    return stock <= threshold;
   });
 
   const revenue = groups.revenueOrders.reduce(
@@ -691,41 +738,6 @@ Réponds UNIQUEMENT en JSON valide :
   });
 }
 
-async function sendTelegramMessage(message) {
-  try {
-    const token = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
-
-    if (!token || !chatId) {
-      return {
-        ok: false,
-        error: "Telegram non configuré dans Vercel"
-      };
-    }
-
-    const response = await fetch(
-      `https://api.telegram.org/bot${token}/sendMessage`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: message
-        })
-      }
-    );
-
-    return await response.json();
-  } catch (error) {
-    return {
-      ok: false,
-      error: error.message
-    };
-  }
-}
-
 async function checkNewOrders(req, res) {
   const envError = checkEnv();
   if (envError) return res.status(500).json({ error: envError });
@@ -755,14 +767,15 @@ async function checkNewOrders(req, res) {
         order.total_amount || order.total_price || 0
       }€\n🕒 Créneau : ${
         order.delivery_slot_label || order.delivery_slot || "Non précisé"
-      }\n📍 Adresse : ${
-        order.delivery_address || "Non précisée"
-      }`
+      }\n📍 Adresse : ${order.delivery_address || "Non précisée"}`
     );
 
     await sandwich
       .from("orders")
-      .update({ notification_sent: true })
+      .update({
+        notification_sent: true,
+        notification_sent_at: new Date().toISOString()
+      })
       .eq("id", order.id);
 
     sent++;
@@ -902,26 +915,22 @@ export default async function handler(req, res) {
     const action = req.query.action;
 
     if (action === "alert-update") return updateAlert(req, res);
-if (action === "add-to-planning") return addToPlanning(req, res);
-if (action === "get-planning") return getPlanning(req, res);
-
+    if (action === "add-to-planning") return addToPlanning(req, res);
+    if (action === "get-planning") return getPlanning(req, res);
     if (action === "check-new-orders") return checkNewOrders(req, res);
 
-if (action === "telegram-test") {
-  const result = await sendTelegramMessage(
-    "✅ Test Telegram AgentOS réussi"
-  );
+    if (action === "telegram-test") {
+      const result = await sendTelegramMessage(
+        "✅ Test Telegram AgentOS réussi"
+      );
 
-  return res.status(200).json({
-    success: true,
-    telegram: result
-  });
-}
-    
-    if (action === "check-stock") {
-    return checkStock(req, res);
+      return res.status(200).json({
+        success: true,
+        telegram: result
+      });
     }
 
+    if (action === "check-stock") return checkStock(req, res);
     if (action === "business-overview") return businessOverview(req, res);
     if (action === "check-alerts") return checkAlerts(req, res);
     if (action === "check-orders") return checkOrders(req, res);
@@ -935,8 +944,13 @@ if (action === "telegram-test") {
         "check-alerts",
         "check-stock",
         "check-orders",
+        "check-new-orders",
         "daily-report",
-        "auto-director"
+        "auto-director",
+        "telegram-test",
+        "alert-update",
+        "add-to-planning",
+        "get-planning"
       ]
     });
   } catch (error) {
