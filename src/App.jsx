@@ -7,6 +7,7 @@ import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import KpiCard from "./components/KpiCard";
 import DashboardPage from "./pages/DashboardPage";
+import Topbar from "./components/Topbar";
 import {
   Brain,
   MessageSquare,
@@ -520,6 +521,7 @@ export default function App() {
 />
 
       <main className="main">
+  <Topbar alerts={alerts} />
         {activeTab === "dashboard" && (
   <DashboardPage
     stats={stats}
