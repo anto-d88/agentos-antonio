@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import TaskList from "./components/TaskList";
+import ConversationCard from "./components/ConversationCard";
 import AlertCard from "./components/AlertCard";
 import PlanningList from "./components/PlanningList";
 import Sidebar from "./components/Sidebar";
@@ -991,81 +993,6 @@ export default function App() {
           </form>
         </div>
       )}
-    </div>
-  );
-}
-
-function TaskList({ tasks, full = false, onComplete }) {
-  if (!tasks || tasks.length === 0) {
-    return <p className="empty">Aucune tâche enregistrée.</p>;
-  }
-
-  return (
-    <div className="task-list">
-      {tasks.map((task) => (
-        <div
-          className={
-            task.completed || task.status === "done"
-              ? "task-card completed"
-              : "task-card"
-          }
-          key={task.id}
-        >
-          <div>
-            <div className="task-tags">
-              <span className={`status ${task.status || "open"}`}>
-                {task.status || "open"}
-              </span>
-
-              <span className={`priority ${task.priority || "medium"}`}>
-                {task.priority || "medium"}
-              </span>
-
-              <span className="task-type">{task.type || "general"}</span>
-            </div>
-
-            <strong>{task.title || "Tâche sans titre"}</strong>
-
-            {full && <p>{task.description}</p>}
-          </div>
-
-          <div className="task-side">
-            <small>
-              {task.from_agent || "Agent"} → {task.to_agent || "Agent"}
-            </small>
-
-            {task.status !== "done" && (
-              <button
-                className="done-button"
-                onClick={() => onComplete(task.id)}
-              >
-                Terminer
-              </button>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ConversationCard({ item }) {
-  return (
-    <div className="conversation-card">
-      <div className="conversation-header">
-        <strong>{item.agent}</strong>
-        <small>{item.date}</small>
-      </div>
-
-      <div className="message-block">
-        <span>Demande</span>
-        <p>{item.userInput}</p>
-      </div>
-
-      <div className="response-block">
-        <span>Réponse</span>
-        <p>{item.response}</p>
-      </div>
     </div>
   );
 }
