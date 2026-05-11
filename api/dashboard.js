@@ -40,11 +40,19 @@ export default async function handler(req, res) {
     const { data: alerts, error: alertsError } = await supabase
       .from("agent_alerts")
       .select("*")
-      .eq("read", false)
+      .eq("deleted", false)
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(50);
 
     if (alertsError) throw alertsError;
+
+    const { data: logs, error: logsError } = await supabase
+      .from("agent_logs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (logsError) throw logsError;
 
     const today = new Date().toISOString().slice(0, 10);
 
@@ -54,6 +62,10 @@ export default async function handler(req, res) {
 
     const openTasks = (tasks || []).filter(
       (task) => !task.completed && task.status !== "done"
+    );
+
+    const unreadAlerts = (alerts || []).filter(
+      (alert) => !alert.read && !alert.deleted
     );
 
     const activeAgents = new Set(
@@ -66,7 +78,7 @@ export default async function handler(req, res) {
       openTasks: openTasks.length,
       memories: memories?.length || 0,
       activeAgents: activeAgents.size,
-      unreadAlerts: alerts?.length || 0
+      unreadAlerts: unreadAlerts.length
     };
 
     return res.status(200).json({
@@ -74,7 +86,8 @@ export default async function handler(req, res) {
       alerts: alerts || [],
       conversations: conversations || [],
       memories: memories || [],
-      tasks: tasks || []
+      tasks: tasks || [],
+      logs: logs || []
     });
   } catch (error) {
     return res.status(500).json({
