@@ -112,6 +112,24 @@ function checkEnv() {
   return null;
 }
 
+async function createLog(agentos, log) {
+  try {
+    await agentos.from("agent_logs").insert([
+      {
+        agent_name: log.agent_name || "Agent IA",
+        action_type: log.action_type || "general",
+        title: log.title || "Action système",
+        description: log.description || "",
+        status: log.status || "success",
+        priority: log.priority || "medium",
+        metadata: log.metadata || {}
+      }
+    ]);
+  } catch (error) {
+    console.error("Erreur création log :", error);
+  }
+}
+
 async function sendTelegramMessage(message) {
   try {
     const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -175,7 +193,7 @@ async function businessOverview(req, res) {
   }, 0);
 
   const lowStock = (products || []).filter((product) => {
-    const stock = Number(product.stock_quantity ?? product.stock ?? 0);
+    const stock = Number(product.stock_quantity || 0);
     const threshold = Number(product.low_stock_threshold ?? 5);
     return stock <= threshold;
   });
@@ -210,7 +228,7 @@ async function checkAlerts(req, res) {
   if (productsError) throw productsError;
 
   const lowStock = (products || []).filter((product) => {
-    const stock = Number(product.stock_quantity ?? product.stock ?? 0);
+    const stock = Number(product.stock_quantity || 0);
     const threshold = Number(product.low_stock_threshold ?? 5);
     return stock <= threshold;
   });
@@ -218,7 +236,7 @@ async function checkAlerts(req, res) {
   const createdAlerts = [];
 
   for (const product of lowStock) {
-    const stock = Number(product.stock_quantity ?? product.stock ?? 0);
+    const stock = Number(product.stock_quantity || 0);
     const productName = product.name || product.title || "Produit sans nom";
 
     const alert = {
@@ -312,16 +330,16 @@ async function checkOrders(req, res) {
         }
       ]);
 
-      created++;
-
       await createLog(agentos, {
-  agent_name: "Agent Commandes",
-  action_type: "task_created",
-  title: "Tâche commande créée",
-  description: `Commande ${order.id} envoyée à l'équipe`,
-  status: "success",
-  priority: "high"
-});
+        agent_name: "Agent Commandes",
+        action_type: "task_created",
+        title: "Tâche commande créée",
+        description: `Commande ${order.id} envoyée à l'équipe`,
+        status: "success",
+        priority: "high"
+      });
+
+      created++;
     }
   }
 
@@ -392,15 +410,6 @@ async function checkStock(req, res) {
 
       alertsCreated++;
 
-      await createLog(agentos, {
-  agent_name: "Agent Stock",
-  action_type: "stock_alert",
-  title: "Alerte stock créée",
-  description: `${productName} est presque en rupture (${stock})`,
-  status: "warning",
-  priority: stock === 0 ? "urgent" : "high"
-});
-
       const telegramResult = await sendTelegramMessage(
         `🚨 Stock faible La Pause Sandwich\n\n📦 Produit : ${productName}\n📉 Stock actuel : ${stock}\n🎯 Seuil : ${threshold}\n⚠️ Priorité : ${
           stock === 0 ? "URGENT" : "HIGH"
@@ -410,6 +419,15 @@ async function checkStock(req, res) {
       if (telegramResult?.ok) {
         telegramSent++;
       }
+
+      await createLog(agentos, {
+        agent_name: "Agent Stock",
+        action_type: "stock_alert",
+        title: "Alerte stock créée",
+        description: `${productName} est presque en rupture (${stock})`,
+        status: "warning",
+        priority: stock === 0 ? "urgent" : "high"
+      });
 
       await sandwich
         .from("products")
@@ -425,7 +443,9 @@ async function checkStock(req, res) {
       await sandwich
         .from("products")
         .update({
-          stock_alert_sent: false
+          stock_alert_sent: false,
+          stock_alert_sent_at: null,
+          last_stock_alert_level: null
         })
         .eq("id", product.id);
 
@@ -487,7 +507,7 @@ async function dailyReport(req, res) {
   );
 
   const lowStock = (products || []).filter((product) => {
-    const stock = Number(product.stock_quantity ?? product.stock ?? 0);
+    const stock = Number(product.stock_quantity || 0);
     const threshold = Number(product.low_stock_threshold ?? 5);
     return stock <= threshold;
   });
@@ -499,7 +519,7 @@ async function dailyReport(req, res) {
   const productsText =
     (products || [])
       .map((product) => {
-        const stock = Number(product.stock_quantity ?? product.stock ?? 0);
+        const stock = Number(product.stock_quantity || 0);
         const price = Number(product.price || product.unit_price || 0);
         return `- ${product.name || product.title || "Produit sans nom"} | stock: ${stock} | prix: ${price}€`;
       })
@@ -528,7 +548,7 @@ async function dailyReport(req, res) {
   const lowStockText =
     lowStock
       .map((product) => {
-        const stock = Number(product.stock_quantity ?? product.stock ?? 0);
+        const stock = Number(product.stock_quantity || 0);
         return `- ${product.name || product.title || "Produit sans nom"} : ${stock}`;
       })
       .join("\n") || "Aucun stock faible.";
@@ -633,7 +653,7 @@ async function autoDirector(req, res) {
   const groups = getOrderGroups(orders || []);
 
   const lowStock = (products || []).filter((product) => {
-    const stock = Number(product.stock_quantity ?? product.stock ?? 0);
+    const stock = Number(product.stock_quantity || 0);
     const threshold = Number(product.low_stock_threshold ?? 5);
     return stock <= threshold;
   });
@@ -646,7 +666,7 @@ async function autoDirector(req, res) {
   const lowStockText =
     lowStock
       .map((product) => {
-        const stock = Number(product.stock_quantity ?? product.stock ?? 0);
+        const stock = Number(product.stock_quantity || 0);
         return `- ${product.name || product.title || "Produit sans nom"} : ${stock}`;
       })
       .join("\n") || "Aucun stock faible.";
@@ -746,16 +766,16 @@ Réponds UNIQUEMENT en JSON valide :
 
     if (taskError) throw taskError;
 
-    savedDecisions.push(insertedDecision);
-
     await createLog(agentos, {
-  agent_name: "Agent Commandes",
-  action_type: "task_created",
-  title: "Tâche commande créée",
-  description: `Commande ${order.id} envoyée à l'équipe`,
-  status: "success",
-  priority: "high"
-});
+      agent_name: "Agent Directeur IA",
+      action_type: "decision",
+      title,
+      description,
+      status: "success",
+      priority
+    });
+
+    savedDecisions.push(insertedDecision);
   }
 
   return res.status(200).json({
@@ -769,7 +789,7 @@ async function checkNewOrders(req, res) {
   const envError = checkEnv();
   if (envError) return res.status(500).json({ error: envError });
 
-  const { sandwich } = getClients();
+  const { agentos, sandwich } = getClients();
 
   const { data: orders, error } = await sandwich
     .from("orders")
@@ -805,21 +825,18 @@ async function checkNewOrders(req, res) {
       })
       .eq("id", order.id);
 
-    sent++;
-
     await createLog(agentos, {
-  agent_name: "Agent Commandes",
-  action_type: "new_order",
-  title: "Nouvelle commande détectée",
-  description: `Commande de ${
-    order.customer_name || "Client"
-  } pour ${
-    order.total_amount || order.total_price || 0
-  }€`,
-  status: "success",
-  priority: "high"
-});
+      agent_name: "Agent Commandes",
+      action_type: "new_order",
+      title: "Nouvelle commande détectée",
+      description: `Commande de ${
+        order.customer_name || "Client"
+      } pour ${order.total_amount || order.total_price || 0}€`,
+      status: "success",
+      priority: "high"
+    });
 
+    sent++;
   }
 
   return res.status(200).json({
@@ -942,6 +959,15 @@ async function addToPlanning(req, res) {
         .eq("id", source_id);
     }
 
+    await createLog(agentos, {
+      agent_name: "Agent Planning IA",
+      action_type: "planning_created",
+      title: "Action ajoutée au planning",
+      description: `${title} ajouté au ${planned_date}`,
+      status: "success",
+      priority
+    });
+
     return res.status(200).json({
       success: true,
       planning
@@ -971,24 +997,6 @@ async function getPlanning(req, res) {
   });
 }
 
-async function createLog(agentos, log) {
-  try {
-    await agentos.from("agent_logs").insert([
-      {
-        agent_name: log.agent_name || "Agent IA",
-        action_type: log.action_type || "general",
-        title: log.title || "Action système",
-        description: log.description || "",
-        status: log.status || "success",
-        priority: log.priority || "medium",
-        metadata: log.metadata || {}
-      }
-    ]);
-  } catch (error) {
-    console.error("Erreur création log :", error);
-  }
-}
-
 async function generatePlanning(req, res) {
   try {
     const envError = checkEnv();
@@ -1000,67 +1008,54 @@ async function generatePlanning(req, res) {
       });
     }
 
+    if (!process.env.GROQ_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        error: "Groq non configuré"
+      });
+    }
+
     const { agentos, groq } = getClients();
 
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const planningDate = tomorrow
-      .toISOString()
-      .slice(0, 10);
+    const planningDate = tomorrow.toISOString().slice(0, 10);
 
-      // supprimer ancien planning IA du même jour
-await agentos
-  .from("agent_planning")
-  .delete()
-  .eq("planned_date", planningDate)
-  .eq("generated_by_ai", true);
+    await agentos
+      .from("agent_planning")
+      .delete()
+      .eq("planned_date", planningDate)
+      .eq("generated_by_ai", true);
 
-    // tâches ouvertes
     const { data: tasks } = await agentos
       .from("agent_tasks")
       .select("*")
       .neq("status", "done")
-      .order("priority", {
-        ascending: false
-      });
+      .order("priority", { ascending: false });
 
-    // alertes non lues
     const { data: alerts } = await agentos
       .from("agent_alerts")
       .select("*")
       .eq("read", false)
       .eq("deleted", false);
 
-    // mémoire opérationnelle
     const { data: memories } = await agentos
       .from("agent_operational_memory")
       .select("*")
       .eq("is_active", true);
 
     const tasksText =
-      (tasks || [])
-        .map(
-          (t) =>
-            `- ${t.title} (${t.priority})`
-        )
-        .join("\n") || "Aucune tâche.";
+      (tasks || []).map((t) => `- ${t.title} (${t.priority})`).join("\n") ||
+      "Aucune tâche.";
 
     const alertsText =
-      (alerts || [])
-        .map(
-          (a) =>
-            `- ${a.title}: ${a.message}`
-        )
-        .join("\n") || "Aucune alerte.";
+      (alerts || []).map((a) => `- ${a.title}: ${a.message}`).join("\n") ||
+      "Aucune alerte.";
 
     const memoriesText =
-      (memories || [])
-        .map(
-          (m) =>
-            `- ${m.title}: ${m.content}`
-        )
-        .join("\n") || "";
+      (memories || []).map((m) => `- ${m.title}: ${m.content}`).join("\n") ||
+      "";
 
     const prompt = `
 Tu es l'Agent Planning IA de La Pause Sandwich.
@@ -1099,106 +1094,131 @@ FORMAT :
 ]
 `;
 
-    const completion =
-      await groq.chat.completions.create({
-        model: "llama-3.1-8b-instant",
-        temperature: 0.2,
-        max_tokens: 1200,
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ]
-      });
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.1-8b-instant",
+      temperature: 0.2,
+      max_tokens: 1200,
+      messages: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ]
+    });
 
-    const raw =
-      completion.choices?.[0]?.message
-        ?.content || "[]";
-
-    const match =
-      raw.match(/\[[\s\S]*\]/);
-
-    const planning =
-      match ? JSON.parse(match[0]) : [];
+    const raw = completion.choices?.[0]?.message?.content || "[]";
+    const match = raw.match(/\[[\s\S]*\]/);
+    const planning = match ? JSON.parse(match[0]) : [];
 
     const inserted = [];
     const insertErrors = [];
 
     for (const item of planning) {
-      const { data, error } =
-        await agentos
-          .from("agent_planning")
-          .insert([
-            {
-              title:
-                item.title ||
-                "Action IA",
+      const cleanTime =
+        item.planned_time && String(item.planned_time).trim() !== ""
+          ? `${String(item.planned_time).slice(0, 5)}:00`
+          : null;
 
-              description:
-                item.description || "",
-
-              planned_date:
-                planningDate,
-
-              planned_time:
-  item.planned_time
-    ? `${String(item.planned_time).slice(0, 5)}:00`
-    : null,
-              priority:
-                item.priority ||
-                "medium",
-
-              generated_by_ai: true,
-
-              status: "planned",
-              completed: false
-            }
-          ])
-          .select()
-          .single();
+      const { data, error } = await agentos
+        .from("agent_planning")
+        .insert([
+          {
+            title: item.title || "Action IA",
+            description: item.description || "",
+            planned_date: planningDate,
+            planned_time: cleanTime,
+            priority: String(item.priority || "medium").toLowerCase(),
+            generated_by_ai: true,
+            status: "planned",
+            completed: false
+          }
+        ])
+        .select()
+        .single();
 
       if (error) {
-  console.error(
-    "Erreur insertion planning IA :",
-    error.message
-  );
-
-  insertErrors.push({
-    title: item.title,
-    error: error.message
-  });
-
-} else if (data) {
-  inserted.push(data);
-}
+        insertErrors.push({
+          title: item.title,
+          error: error.message
+        });
+      } else if (data) {
+        inserted.push(data);
+      }
     }
 
     await createLog(agentos, {
-      agent_name:
-        "Agent Planning IA",
-
-      action_type:
-        "planning_generation",
-
-      title:
-        "Planning généré automatiquement",
-
-      description:
-        `${inserted.length} actions planifiées pour ${planningDate}`,
-
+      agent_name: "Agent Planning IA",
+      action_type: "planning_generation",
+      title: "Planning généré automatiquement",
+      description: `${inserted.length} actions planifiées pour ${planningDate}`,
       status: "success",
       priority: "high"
     });
 
-return res.status(200).json({
-  success: true,
-  planningDate,
-  generated: inserted.length,
-  raw,
-  insertErrors,
-  planning: inserted
-});
+    return res.status(200).json({
+      success: true,
+      planningDate,
+      generated: inserted.length,
+      raw,
+      insertErrors,
+      planning: inserted
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
+
+async function movePlanningEvent(req, res) {
+  try {
+    const { agentos } = getClients();
+
+    const { id, planned_date, planned_time } = req.body;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: "id obligatoire"
+      });
+    }
+
+    const cleanTime =
+      planned_time && String(planned_time).trim() !== ""
+        ? String(planned_time).slice(0, 8)
+        : null;
+
+    const { data, error } = await agentos
+      .from("agent_planning")
+      .update({
+        planned_date,
+        planned_time: cleanTime
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+
+    await createLog(agentos, {
+      agent_name: "Agent Planning IA",
+      action_type: "planning_moved",
+      title: "Événement déplacé",
+      description: `${data.title} déplacé au ${planned_date} à ${cleanTime}`,
+      status: "success",
+      priority: data.priority || "medium"
+    });
+
+    return res.status(200).json({
+      success: true,
+      planning: data
+    });
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -1214,6 +1234,8 @@ export default async function handler(req, res) {
     if (action === "alert-update") return updateAlert(req, res);
     if (action === "add-to-planning") return addToPlanning(req, res);
     if (action === "get-planning") return getPlanning(req, res);
+    if (action === "move-planning-event") return movePlanningEvent(req, res);
+    if (action === "generate-planning") return generatePlanning(req, res);
     if (action === "check-new-orders") return checkNewOrders(req, res);
 
     if (action === "telegram-test") {
@@ -1233,10 +1255,6 @@ export default async function handler(req, res) {
     if (action === "check-orders") return checkOrders(req, res);
     if (action === "daily-report") return dailyReport(req, res);
     if (action === "auto-director") return autoDirector(req, res);
-    if (action === "generate-planning") {return generatePlanning(req, res);}
-    if (action === "move-planning-event") {return movePlanningEvent(req, res);}
-
-
 
     return res.status(400).json({
       error: "Action inconnue",
@@ -1251,59 +1269,13 @@ export default async function handler(req, res) {
         "telegram-test",
         "alert-update",
         "add-to-planning",
-        "get-planning"
+        "get-planning",
+        "generate-planning",
+        "move-planning-event"
       ]
     });
   } catch (error) {
     return res.status(500).json({
-      error: error.message
-    });
-  }
-}
-
-async function movePlanningEvent(req, res) {
-  try {
-    const { agentos } =
-      getClients();
-
-    const {
-      id,
-      planned_date,
-      planned_time
-    } = req.body;
-
-    if (!id) {
-      return res.status(400).json({
-        success: false,
-        error: "id obligatoire"
-      });
-    }
-
-    const { data, error } =
-      await agentos
-        .from("agent_planning")
-        .update({
-          planned_date,
-          planned_time
-        })
-        .eq("id", id)
-        .select()
-        .single();
-
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        error: error.message
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      planning: data
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
       error: error.message
     });
   }

@@ -1,4 +1,3 @@
-import PlanningCalendar from "./components/PlanningCalendar";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
@@ -25,6 +24,7 @@ import TaskList from "./components/TaskList";
 import ConversationCard from "./components/ConversationCard";
 import AlertCard from "./components/AlertCard";
 import PlanningList from "./components/PlanningList";
+import PlanningCalendar from "./components/PlanningCalendar";
 
 import DashboardPage from "./pages/DashboardPage";
 import LogsPage from "./pages/LogsPage";
@@ -143,6 +143,7 @@ export default function App() {
 
   const [planningModalOpen, setPlanningModalOpen] = useState(false);
   const [planningSourceAlert, setPlanningSourceAlert] = useState(null);
+  const [editingPlanningItem, setEditingPlanningItem] = useState(null);
   const [planningForm, setPlanningForm] = useState({
     title: "",
     description: "",
@@ -346,6 +347,7 @@ export default function App() {
   function openPlanningModal(alert) {
     const today = new Date().toISOString().slice(0, 10);
 
+    setEditingPlanningItem(null);
     setPlanningSourceAlert(alert);
     setPlanningForm({
       title: alert.title || "Action à planifier",
@@ -357,21 +359,30 @@ export default function App() {
     setPlanningModalOpen(true);
   }
 
+  function openPlanningItemModal(item) {
+    setPlanningSourceAlert(null);
+    setEditingPlanningItem(item);
+    setPlanningForm({
+      title: item.title || "",
+      description: item.description || "",
+      planned_date: item.planned_date || "",
+      planned_time: item.planned_time ? String(item.planned_time).slice(0, 5) : "",
+      priority: item.priority || "medium"
+    });
+    setPlanningModalOpen(true);
+  }
+
   function closePlanningModal() {
     setPlanningModalOpen(false);
     setPlanningSourceAlert(null);
+    setEditingPlanningItem(null);
   }
 
   async function submitPlanning(e) {
-  e.preventDefault();
+    e.preventDefault();
 
-  try {
-    const res = await fetch(`${API_URL}/api/ops?action=add-to-planning`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
+    try {
+      const payload = {
         ...planningForm,
         planned_time:
           planningForm.planned_time && planningForm.planned_time.trim() !== ""
@@ -380,30 +391,89 @@ export default function App() {
         priority: planningForm.priority?.toLowerCase() || "medium",
         source_type: planningSourceAlert ? "alert" : "manual",
         source_id: planningSourceAlert?.id || null
-      })
-    });
+      };
 
-    const text = await res.text();
+      const res = await fetch(`${API_URL}/api/ops?action=add-to-planning`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
 
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      throw new Error(text.slice(0, 200));
+      const text = await res.text();
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(text.slice(0, 200));
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur planning");
+      }
+
+      closePlanningModal();
+      await loadDashboard();
+      await loadPlanning();
+      setActiveTab("planning");
+    } catch (error) {
+      alert("Erreur ajout planning : " + error.message);
     }
-
-    if (!res.ok) {
-      throw new Error(data.error || "Erreur planning");
-    }
-
-    closePlanningModal();
-    await loadDashboard();
-    await loadPlanning();
-    setActiveTab("planning");
-  } catch (error) {
-    alert("Erreur ajout planning : " + error.message);
   }
-}
+
+  async function handleMovePlanningEvent(item, start) {
+    try {
+      const res = await fetch(
+        `${API_URL}/api/ops?action=move-planning-event`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            id: item.id,
+            planned_date: start.toISOString().slice(0, 10),
+            planned_time: start.toTimeString().slice(0, 8)
+          })
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur déplacement planning");
+      }
+
+      await loadPlanning();
+      await loadDashboard();
+    } catch (error) {
+      alert("Erreur déplacement planning : " + error.message);
+    }
+  }
+
+  async function generateAIPlanning() {
+    try {
+      setIsRefreshing(true);
+
+      const res = await fetch(`${API_URL}/api/ops?action=generate-planning`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur génération planning");
+      }
+
+      await loadPlanning();
+      await loadDashboard();
+
+      alert(`Planning IA généré : ${data.generated || 0} actions ajoutées.`);
+    } catch (error) {
+      alert("Erreur génération planning : " + error.message);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
 
   async function handleSend() {
     if (!userInput.trim() || isLoading) return;
@@ -614,7 +684,7 @@ export default function App() {
           <>
             <Header
               title="Planning opérationnel"
-              subtitle="Les actions planifiées depuis les alertes, agents et décisions importantes."
+              subtitle="Calendrier IA connecté aux alertes, tâches et agents."
             />
 
             <section className="planning-toolbar">
@@ -622,6 +692,7 @@ export default function App() {
                 className="refresh-button"
                 onClick={() => {
                   setPlanningSourceAlert(null);
+                  setEditingPlanningItem(null);
                   setPlanningForm({
                     title: "",
                     description: "",
@@ -635,66 +706,31 @@ export default function App() {
                 <Plus size={18} />
                 Ajouter au planning
               </button>
+
+              <button
+                className="refresh-button"
+                onClick={generateAIPlanning}
+                disabled={isRefreshing}
+              >
+                Générer planning IA
+              </button>
             </section>
 
             <section className="planning-grid">
-  <PlanningCalendar
-    items={planning}
-    onSelectEvent={(item) => {
-      setPlanningSourceAlert(null);
-      setPlanningForm({
-        title: item.title || "",
-        description: item.description || "",
-        planned_date: item.planned_date || "",
-        planned_time: item.planned_time || "",
-        priority: item.priority || "medium"
-      });
-      setPlanningModalOpen(true);
-    }}
-    onMoveEvent={async (
-  item,
-  start
-) => {
-  try {
-    await fetch(
-      `${API_URL}/api/ops?action=move-planning-event`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            "application/json"
-        },
-        body: JSON.stringify({
-          id: item.id,
-          planned_date:
-            start
-              .toISOString()
-              .slice(0, 10),
+              <PlanningCalendar
+                items={planning}
+                onSelectEvent={openPlanningItemModal}
+                onMoveEvent={handleMovePlanningEvent}
+              />
 
-          planned_time:
-            start
-              .toTimeString()
-              .slice(0, 8)
-        })
-      }
-    );
+              <div className="panel">
+                <div className="panel-header">
+                  <h3>Liste planning</h3>
+                </div>
 
-    await loadPlanning();
-
-  } catch (error) {
-    console.error(error);
-  }
-}}
-  />
-
-  <div className="panel">
-    <div className="panel-header">
-      <h3>Liste planning</h3>
-    </div>
-
-    <PlanningList items={planning} />
-  </div>
-</section>
+                <PlanningList items={planning} />
+              </div>
+            </section>
           </>
         )}
 
@@ -889,7 +925,11 @@ export default function App() {
             <div className="modal-header">
               <div>
                 <p className="label">Planning</p>
-                <h3>Ajouter une action</h3>
+                <h3>
+                  {editingPlanningItem
+                    ? "Modifier une action"
+                    : "Ajouter une action"}
+                </h3>
               </div>
 
               <button
@@ -987,7 +1027,7 @@ export default function App() {
               </button>
 
               <button type="submit" className="refresh-button">
-                Ajouter au planning
+                {editingPlanningItem ? "Enregistrer" : "Ajouter au planning"}
               </button>
             </div>
           </form>
