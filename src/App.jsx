@@ -1,3 +1,4 @@
+import PlanningCalendar from "./components/PlanningCalendar";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
@@ -625,8 +626,29 @@ export default function App() {
             </section>
 
             <section className="planning-grid">
-              <PlanningList items={planning} />
-            </section>
+  <PlanningCalendar
+    items={planning}
+    onSelectEvent={(item) => {
+      setPlanningSourceAlert(null);
+      setPlanningForm({
+        title: item.title || "",
+        description: item.description || "",
+        planned_date: item.planned_date || "",
+        planned_time: item.planned_time || "",
+        priority: item.priority || "medium"
+      });
+      setPlanningModalOpen(true);
+    }}
+  />
+
+  <div className="panel">
+    <div className="panel-header">
+      <h3>Liste planning</h3>
+    </div>
+
+    <PlanningList items={planning} />
+  </div>
+</section>
           </>
         )}
 
