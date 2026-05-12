@@ -989,6 +989,203 @@ async function createLog(agentos, log) {
   }
 }
 
+async function generatePlanning(req, res) {
+  try {
+    const envError = checkEnv();
+
+    if (envError) {
+      return res.status(500).json({
+        success: false,
+        error: envError
+      });
+    }
+
+    const { agentos, groq } = getClients();
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const planningDate = tomorrow
+      .toISOString()
+      .slice(0, 10);
+
+    // tâches ouvertes
+    const { data: tasks } = await agentos
+      .from("agent_tasks")
+      .select("*")
+      .neq("status", "done")
+      .order("priority", {
+        ascending: false
+      });
+
+    // alertes non lues
+    const { data: alerts } = await agentos
+      .from("agent_alerts")
+      .select("*")
+      .eq("read", false)
+      .eq("deleted", false);
+
+    // mémoire opérationnelle
+    const { data: memories } = await agentos
+      .from("agent_operational_memory")
+      .select("*")
+      .eq("is_active", true);
+
+    const tasksText =
+      (tasks || [])
+        .map(
+          (t) =>
+            `- ${t.title} (${t.priority})`
+        )
+        .join("\n") || "Aucune tâche.";
+
+    const alertsText =
+      (alerts || [])
+        .map(
+          (a) =>
+            `- ${a.title}: ${a.message}`
+        )
+        .join("\n") || "Aucune alerte.";
+
+    const memoriesText =
+      (memories || [])
+        .map(
+          (m) =>
+            `- ${m.title}: ${m.content}`
+        )
+        .join("\n") || "";
+
+    const prompt = `
+Tu es l'Agent Planning IA de La Pause Sandwich.
+
+MISSION :
+Créer un planning intelligent et réaliste pour demain.
+
+DATE :
+${planningDate}
+
+MÉMOIRE OPÉRATIONNELLE :
+${memoriesText}
+
+TÂCHES :
+${tasksText}
+
+ALERTES :
+${alertsText}
+
+RÈGLES :
+- Organise la journée intelligemment
+- Respecte les créneaux livraison
+- Priorise les urgences
+- Prévois préparation avant livraison
+- Prévois nettoyage et administratif
+- Réponse UNIQUEMENT en JSON valide
+
+FORMAT :
+[
+  {
+    "title": "Préparation cuisine",
+    "description": "Préparer les sandwichs du midi",
+    "planned_time": "10:30",
+    "priority": "high"
+  }
+]
+`;
+
+    const completion =
+      await groq.chat.completions.create({
+        model: "llama-3.1-8b-instant",
+        temperature: 0.2,
+        max_tokens: 1200,
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ]
+      });
+
+    const raw =
+      completion.choices?.[0]?.message
+        ?.content || "[]";
+
+    const match =
+      raw.match(/\[[\s\S]*\]/);
+
+    const planning =
+      match ? JSON.parse(match[0]) : [];
+
+    const inserted = [];
+
+    for (const item of planning) {
+      const { data, error } =
+        await agentos
+          .from("agent_planning")
+          .insert([
+            {
+              title:
+                item.title ||
+                "Action IA",
+
+              description:
+                item.description || "",
+
+              planned_date:
+                planningDate,
+
+              planned_time:
+                item.planned_time ||
+                null,
+
+              priority:
+                item.priority ||
+                "medium",
+
+              generated_by_ai: true,
+
+              status: "planned",
+              completed: false
+            }
+          ])
+          .select()
+          .single();
+
+      if (!error && data) {
+        inserted.push(data);
+      }
+    }
+
+    await createLog(agentos, {
+      agent_name:
+        "Agent Planning IA",
+
+      action_type:
+        "planning_generation",
+
+      title:
+        "Planning généré automatiquement",
+
+      description:
+        `${inserted.length} actions planifiées pour ${planningDate}`,
+
+      status: "success",
+      priority: "high"
+    });
+
+    return res.status(200).json({
+      success: true,
+      planningDate,
+      generated: inserted.length,
+      planning: inserted
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
+
 export default async function handler(req, res) {
   try {
     const action = req.query.action;
@@ -1015,6 +1212,9 @@ export default async function handler(req, res) {
     if (action === "check-orders") return checkOrders(req, res);
     if (action === "daily-report") return dailyReport(req, res);
     if (action === "auto-director") return autoDirector(req, res);
+    if (action === "generate-planning") {return generatePlanning(req, res);}
+
+
 
     return res.status(400).json({
       error: "Action inconnue",
