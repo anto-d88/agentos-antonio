@@ -1134,9 +1134,9 @@ FORMAT :
                 planningDate,
 
               planned_time:
-                item.planned_time ||
-                null,
-
+  item.planned_time
+    ? `${String(item.planned_time).slice(0, 5)}:00`
+    : null,
               priority:
                 item.priority ||
                 "medium",
@@ -1150,9 +1150,11 @@ FORMAT :
           .select()
           .single();
 
-      if (!error && data) {
-        inserted.push(data);
-      }
+      if (error) {
+  console.error("Erreur insertion planning IA :", error.message);
+} else if (data) {
+  inserted.push(data);
+}
     }
 
     await createLog(agentos, {
