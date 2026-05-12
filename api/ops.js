@@ -1009,6 +1009,13 @@ async function generatePlanning(req, res) {
       .toISOString()
       .slice(0, 10);
 
+      // supprimer ancien planning IA du même jour
+await agentos
+  .from("agent_planning")
+  .delete()
+  .eq("planned_date", planningDate)
+  .eq("generated_by_ai", true);
+
     // tâches ouvertes
     const { data: tasks } = await agentos
       .from("agent_tasks")
