@@ -1074,12 +1074,12 @@ ALERTES :
 ${alertsText}
 
 RÈGLES :
-- Organise la journée intelligemment
-- Respecte les créneaux livraison
-- Priorise les urgences
-- Prévois préparation avant livraison
-- Prévois nettoyage et administratif
-- Réponse UNIQUEMENT en JSON valide
+- Tu dois créer au minimum 5 actions même si les données sont faibles.
+- Organise la journée intelligemment.
+- Respecte les créneaux livraison.
+- Prévois toujours : vérification commandes, stock/courses, préparation cuisine, livraison, nettoyage, administratif/prospection.
+- Réponse UNIQUEMENT en JSON valide.
+- Ne mets aucun texte avant ou après le JSON.
 
 FORMAT :
 [
@@ -1172,12 +1172,13 @@ FORMAT :
       priority: "high"
     });
 
-    return res.status(200).json({
-      success: true,
-      planningDate,
-      generated: inserted.length,
-      planning: inserted
-    });
+return res.status(200).json({
+  success: true,
+  planningDate,
+  generated: inserted.length,
+  raw,
+  planning: inserted
+});
   } catch (error) {
     return res.status(500).json({
       success: false,
