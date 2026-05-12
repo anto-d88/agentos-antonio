@@ -651,6 +651,40 @@ export default function App() {
       });
       setPlanningModalOpen(true);
     }}
+    onMoveEvent={async (
+  item,
+  start
+) => {
+  try {
+    await fetch(
+      `${API_URL}/api/ops?action=move-planning-event`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+        body: JSON.stringify({
+          id: item.id,
+          planned_date:
+            start
+              .toISOString()
+              .slice(0, 10),
+
+          planned_time:
+            start
+              .toTimeString()
+              .slice(0, 8)
+        })
+      }
+    );
+
+    await loadPlanning();
+
+  } catch (error) {
+    console.error(error);
+  }
+}}
   />
 
   <div className="panel">

@@ -1234,6 +1234,7 @@ export default async function handler(req, res) {
     if (action === "daily-report") return dailyReport(req, res);
     if (action === "auto-director") return autoDirector(req, res);
     if (action === "generate-planning") {return generatePlanning(req, res);}
+    if (action === "move-planning-event") {return movePlanningEvent(req, res);}
 
 
 
@@ -1255,6 +1256,54 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     return res.status(500).json({
+      error: error.message
+    });
+  }
+}
+
+async function movePlanningEvent(req, res) {
+  try {
+    const { agentos } =
+      getClients();
+
+    const {
+      id,
+      planned_date,
+      planned_time
+    } = req.body;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: "id obligatoire"
+      });
+    }
+
+    const { data, error } =
+      await agentos
+        .from("agent_planning")
+        .update({
+          planned_date,
+          planned_time
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      planning: data
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
       error: error.message
     });
   }
