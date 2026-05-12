@@ -1116,6 +1116,7 @@ FORMAT :
       match ? JSON.parse(match[0]) : [];
 
     const inserted = [];
+    const insertErrors = [];
 
     for (const item of planning) {
       const { data, error } =
@@ -1151,7 +1152,16 @@ FORMAT :
           .single();
 
       if (error) {
-  console.error("Erreur insertion planning IA :", error.message);
+  console.error(
+    "Erreur insertion planning IA :",
+    error.message
+  );
+
+  insertErrors.push({
+    title: item.title,
+    error: error.message
+  });
+
 } else if (data) {
   inserted.push(data);
 }
@@ -1179,6 +1189,7 @@ return res.status(200).json({
   planningDate,
   generated: inserted.length,
   raw,
+  insertErrors,
   planning: inserted
 });
   } catch (error) {
