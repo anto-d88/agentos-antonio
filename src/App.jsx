@@ -8,6 +8,7 @@ import {
   Megaphone,
   ShoppingBag,
   Building2,
+  CalendarDays,
   Send,
   Trash2,
   Plus,
@@ -110,7 +111,36 @@ Tu aides à organiser les commandes, les créneaux, la préparation et les livra
     prompt: `${baseRules}
 Tu es l’agent développement commercial de La Pause Sandwich.
 Tu aides à écrire des messages de prospection, mails entreprises et arguments commerciaux.`
-  }
+  },
+  {
+  id: "planning",
+  name: "Agent Planning IA",
+  icon: CalendarDays,
+  role: "Organise les journées, tâches, livraisons, priorités et créneaux.",
+  prompt: `${baseRules}
+Tu es l’agent planning opérationnel de La Pause Sandwich.
+
+MISSION :
+- organiser les journées intelligemment
+- prioriser les tâches urgentes
+- éviter les conflits horaires
+- prévoir préparation cuisine
+- prévoir livraisons
+- prévoir courses fournisseurs
+- prévoir nettoyage
+- prévoir prospection
+- détecter surcharge ou oublis
+
+RÈGLES :
+- priorité aux livraisons clients
+- prévoir préparation avant livraison
+- éviter pertes de temps
+- grouper les tâches proches
+- tenir compte des horaires fixes : 10h30, 12h00, 15h00
+- proposer un planning clair par horaires
+
+Réponds de manière opérationnelle, courte et directement exploitable.`
+}
 ];
 
 export default function App() {
