@@ -505,6 +505,42 @@ export default function App() {
     }
   }
 
+  async function executePlanningJsonIfPresent(text) {
+  try {
+    if (!selectedAgent.name.toLowerCase().includes("planning")) return;
+
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) return;
+
+    const actions = JSON.parse(match[0]);
+
+    if (!Array.isArray(actions)) return;
+
+    const res = await fetch(`${API_URL}/api/ops?action=execute-planning-actions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ actions })
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      throw new Error(result.error || "Erreur exécution planning");
+    }
+
+    toast.success("Planning mis à jour par l’Agent Planning IA");
+
+    await loadPlanning();
+    await loadDashboard();
+    setActiveTab("planning");
+  } catch (error) {
+    console.error("Erreur exécution JSON planning :", error);
+    toast.error("JSON planning détecté mais non exécuté");
+  }
+}
+
   async function handleSend() {
     if (!userInput.trim() || isLoading) return;
 
@@ -545,6 +581,8 @@ export default function App() {
       }
 
       const responseText = data.response || "Pas de réponse reçue.";
+
+      await executePlanningJsonIfPresent(responseText);
 
       setHistory((prev) =>
         prev.map((item) =>
