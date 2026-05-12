@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import {
   Activity,
   AlertTriangle,
@@ -36,7 +37,12 @@ export default function DashboardPage({
         subtitle="Vue centrale des agents IA, alertes, tâches et automatisations."
       />
 
-      <section className="kpi-grid">
+      <motion.section
+  className="kpi-grid"
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.45 }}
+>
         <KpiCard
           title="Conversations aujourd’hui"
           value={stats.conversationsToday}
@@ -63,9 +69,17 @@ export default function DashboardPage({
           value={stats.activeAgents}
           icon={Users}
         />
-      </section>
+      </motion.section>
 
-      <section className="dashboard-grid">
+      <motion.section
+  className="dashboard-grid"
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  transition={{
+    duration: 0.5,
+    delay: 0.15
+  }}
+>
         <div className="panel large">
           <div className="panel-header">
             <h3>Activité IA récente</h3>
@@ -167,7 +181,7 @@ export default function DashboardPage({
             compact
           />
         </div>
-      </section>
+      </motion.section>
     </>
   );
 }
