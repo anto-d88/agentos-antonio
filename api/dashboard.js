@@ -29,6 +29,16 @@ export default async function handler(req, res) {
 
     if (memoriesError) throw memoriesError;
 
+    const { data: operationalMemory, error: operationalMemoryError } =
+      await supabase
+        .from("agent_operational_memory")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+    if (operationalMemoryError) throw operationalMemoryError;
+
     const { data: tasks, error: tasksError } = await supabase
       .from("agent_tasks")
       .select("*")
@@ -46,6 +56,15 @@ export default async function handler(req, res) {
 
     if (alertsError) throw alertsError;
 
+    const { data: planning, error: planningError } = await supabase
+      .from("agent_planning")
+      .select("*")
+      .order("planned_date", { ascending: true })
+      .order("planned_time", { ascending: true })
+      .limit(200);
+
+    if (planningError) throw planningError;
+
     const { data: logs, error: logsError } = await supabase
       .from("agent_logs")
       .select("*")
@@ -60,6 +79,10 @@ export default async function handler(req, res) {
       item.created_at?.startsWith(today)
     );
 
+    const todayPlanning = (planning || []).filter(
+      (item) => item.planned_date === today
+    );
+
     const openTasks = (tasks || []).filter(
       (task) => !task.completed && task.status !== "done"
     );
@@ -69,7 +92,20 @@ export default async function handler(req, res) {
     );
 
     const activeAgents = new Set(
-      (conversations || []).map((item) => item.agent)
+      (conversations || [])
+        .map((item) => item.agent)
+        .filter(Boolean)
+    );
+
+    const urgentAlerts = (alerts || []).filter(
+      (alert) =>
+        !alert.read &&
+        !alert.deleted &&
+        String(alert.priority || "").toLowerCase() === "urgent"
+    );
+
+    const generatedPlanning = (planning || []).filter(
+      (item) => item.generated_by_ai === true
     );
 
     const stats = {
@@ -77,20 +113,29 @@ export default async function handler(req, res) {
       totalConversations: conversations?.length || 0,
       openTasks: openTasks.length,
       memories: memories?.length || 0,
+      operationalMemory: operationalMemory?.length || 0,
       activeAgents: activeAgents.size,
-      unreadAlerts: unreadAlerts.length
+      unreadAlerts: unreadAlerts.length,
+      urgentAlerts: urgentAlerts.length,
+      planningToday: todayPlanning.length,
+      generatedPlanning: generatedPlanning.length,
+      logs: logs?.length || 0
     };
 
     return res.status(200).json({
+      success: true,
       stats,
       alerts: alerts || [],
       conversations: conversations || [],
       memories: memories || [],
+      operationalMemory: operationalMemory || [],
       tasks: tasks || [],
+      planning: planning || [],
       logs: logs || []
     });
   } catch (error) {
     return res.status(500).json({
+      success: false,
       error: error.message
     });
   }
