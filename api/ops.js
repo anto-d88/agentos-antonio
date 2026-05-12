@@ -313,6 +313,15 @@ async function checkOrders(req, res) {
       ]);
 
       created++;
+
+      await createLog(agentos, {
+  agent_name: "Agent Commandes",
+  action_type: "task_created",
+  title: "Tâche commande créée",
+  description: `Commande ${order.id} envoyée à l'équipe`,
+  status: "success",
+  priority: "high"
+});
     }
   }
 
@@ -382,6 +391,15 @@ async function checkStock(req, res) {
       ]);
 
       alertsCreated++;
+
+      await createLog(agentos, {
+  agent_name: "Agent Stock",
+  action_type: "stock_alert",
+  title: "Alerte stock créée",
+  description: `${productName} est presque en rupture (${stock})`,
+  status: "warning",
+  priority: stock === 0 ? "urgent" : "high"
+});
 
       const telegramResult = await sendTelegramMessage(
         `🚨 Stock faible La Pause Sandwich\n\n📦 Produit : ${productName}\n📉 Stock actuel : ${stock}\n🎯 Seuil : ${threshold}\n⚠️ Priorité : ${
@@ -729,6 +747,15 @@ Réponds UNIQUEMENT en JSON valide :
     if (taskError) throw taskError;
 
     savedDecisions.push(insertedDecision);
+
+    await createLog(agentos, {
+  agent_name: "Agent Commandes",
+  action_type: "task_created",
+  title: "Tâche commande créée",
+  description: `Commande ${order.id} envoyée à l'équipe`,
+  status: "success",
+  priority: "high"
+});
   }
 
   return res.status(200).json({
@@ -779,6 +806,20 @@ async function checkNewOrders(req, res) {
       .eq("id", order.id);
 
     sent++;
+
+    await createLog(agentos, {
+  agent_name: "Agent Commandes",
+  action_type: "new_order",
+  title: "Nouvelle commande détectée",
+  description: `Commande de ${
+    order.customer_name || "Client"
+  } pour ${
+    order.total_amount || order.total_price || 0
+  }€`,
+  status: "success",
+  priority: "high"
+});
+
   }
 
   return res.status(200).json({
@@ -908,6 +949,24 @@ async function getPlanning(req, res) {
     success: true,
     planning: data || []
   });
+}
+
+async function createLog(agentos, log) {
+  try {
+    await agentos.from("agent_logs").insert([
+      {
+        agent_name: log.agent_name || "Agent IA",
+        action_type: log.action_type || "general",
+        title: log.title || "Action système",
+        description: log.description || "",
+        status: log.status || "success",
+        priority: log.priority || "medium",
+        metadata: log.metadata || {}
+      }
+    ]);
+  } catch (error) {
+    console.error("Erreur création log :", error);
+  }
 }
 
 export default async function handler(req, res) {
