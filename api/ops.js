@@ -878,61 +878,16 @@ async function updateAlert(req, res) {
   });
 }
 
-async function addToPlanning(req, res) {
-  const { agentos } = getClients();
-
-  const {
-    title,
-    description,
-    planned_date,
-    planned_time,
-    priority,
-    source_type,
-    source_id
-  } = req.body;
-
-  if (!title || !planned_date) {
-    return res.status(400).json({
-      error: "title et planned_date obligatoires"
-    });
-  }
-
-  const { data: planning, error } = await agentos
-    .from("agent_planning")
-    .insert([
-      {
-        title,
-        description,
-        planned_date,
-        planned_time,
-        priority: priority || "medium",
-        source_type: source_type || null,
-        source_id: source_id || null,
-        status: "planned",
-        completed: false
-      }
-    ])
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  if (source_type === "alert" && source_id) {
-    await agentos
-      .from("agent_alerts")
-      .update({
-        planned: true,
-        status: "planned",
-        read: true
-      })
-      .eq("id", source_id);
-  }
-
-  return res.status(200).json({
-    success: true,
-    planning
-  });
-}
+body: JSON.stringify({
+  ...planningForm,
+  planned_time:
+    planningForm.planned_time && planningForm.planned_time.trim() !== ""
+      ? planningForm.planned_time
+      : null,
+  priority: planningForm.priority?.toLowerCase() || "medium",
+  source_type: planningSourceAlert ? "alert" : "manual",
+  source_id: planningSourceAlert?.id || null
+})
 
 async function getPlanning(req, res) {
   const { agentos } = getClients();
