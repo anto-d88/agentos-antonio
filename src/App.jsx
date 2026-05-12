@@ -363,35 +363,47 @@ export default function App() {
   }
 
   async function submitPlanning(e) {
-    e.preventDefault();
+  e.preventDefault();
 
+  try {
+    const res = await fetch(`${API_URL}/api/ops?action=add-to-planning`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        ...planningForm,
+        planned_time:
+          planningForm.planned_time && planningForm.planned_time.trim() !== ""
+            ? planningForm.planned_time
+            : null,
+        priority: planningForm.priority?.toLowerCase() || "medium",
+        source_type: planningSourceAlert ? "alert" : "manual",
+        source_id: planningSourceAlert?.id || null
+      })
+    });
+
+    const text = await res.text();
+
+    let data;
     try {
-      const res = await fetch(`${API_URL}/api/ops?action=add-to-planning`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          ...planningForm,
-          source_type: planningSourceAlert ? "alert" : "manual",
-          source_id: planningSourceAlert?.id || null
-        })
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Erreur planning");
-      }
-
-      closePlanningModal();
-      await loadDashboard();
-      await loadPlanning();
-      setActiveTab("planning");
-    } catch (error) {
-      alert("Erreur ajout planning : " + error.message);
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(text.slice(0, 200));
     }
+
+    if (!res.ok) {
+      throw new Error(data.error || "Erreur planning");
+    }
+
+    closePlanningModal();
+    await loadDashboard();
+    await loadPlanning();
+    setActiveTab("planning");
+  } catch (error) {
+    alert("Erreur ajout planning : " + error.message);
   }
+}
 
   async function handleSend() {
     if (!userInput.trim() || isLoading) return;
