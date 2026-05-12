@@ -1227,6 +1227,167 @@ async function movePlanningEvent(req, res) {
   }
 }
 
+async function executePlanningActions(req, res) {
+  try {
+    const { agentos } = getClients();
+
+    const { actions } = req.body;
+
+    if (!Array.isArray(actions)) {
+      return res.status(400).json({
+        success: false,
+        error: "actions doit être un tableau"
+      });
+    }
+
+    const results = [];
+
+    for (const action of actions) {
+
+      // CREATE
+      if (action.action === "create") {
+
+        const { data, error } =
+          await agentos
+            .from("agent_planning")
+            .insert([
+              {
+                title:
+                  action.title ||
+                  "Nouvelle action",
+
+                description:
+                  action.description || "",
+
+                planned_date:
+                  action.planned_date,
+
+                planned_time:
+                  action.planned_time || null,
+
+                priority:
+                  action.priority ||
+                  "medium",
+
+                generated_by_ai: true,
+
+                status: "planned",
+                completed: false
+              }
+            ])
+            .select()
+            .single();
+
+        if (error) {
+          results.push({
+            success: false,
+            error: error.message
+          });
+        } else {
+          results.push({
+            success: true,
+            type: "create",
+            data
+          });
+        }
+      }
+
+      // UPDATE
+      if (
+        action.action === "update" &&
+        action.task_id
+      ) {
+
+        const updates = {};
+
+        if (action.title)
+          updates.title =
+            action.title;
+
+        if (action.description)
+          updates.description =
+            action.description;
+
+        if (action.planned_date)
+          updates.planned_date =
+            action.planned_date;
+
+        if (action.planned_time)
+          updates.planned_time =
+            action.planned_time;
+
+        if (action.priority)
+          updates.priority =
+            action.priority;
+
+        const { data, error } =
+          await agentos
+            .from("agent_planning")
+            .update(updates)
+            .eq(
+              "id",
+              action.task_id
+            )
+            .select()
+            .single();
+
+        if (error) {
+          results.push({
+            success: false,
+            error: error.message
+          });
+        } else {
+          results.push({
+            success: true,
+            type: "update",
+            data
+          });
+        }
+      }
+
+      // DELETE
+      if (
+        action.action === "delete" &&
+        action.task_id
+      ) {
+
+        const { error } =
+          await agentos
+            .from("agent_planning")
+            .delete()
+            .eq(
+              "id",
+              action.task_id
+            );
+
+        if (error) {
+          results.push({
+            success: false,
+            error: error.message
+          });
+        } else {
+          results.push({
+            success: true,
+            type: "delete",
+            id: action.task_id
+          });
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      results
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
+
 export default async function handler(req, res) {
   try {
     const action = req.query.action;
@@ -1255,6 +1416,7 @@ export default async function handler(req, res) {
     if (action === "check-orders") return checkOrders(req, res);
     if (action === "daily-report") return dailyReport(req, res);
     if (action === "auto-director") return autoDirector(req, res);
+    if (action ==="execute-planning-actions") {return executePlanningActions(req,res);}
 
     return res.status(400).json({
       error: "Action inconnue",
