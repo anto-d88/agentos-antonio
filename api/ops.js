@@ -1388,6 +1388,67 @@ async function executePlanningActions(req, res) {
   }
 }
 
+async function updatePlanningStatus(req, res) {
+  try {
+
+    const { agentos } =
+      getClients();
+
+    const {
+      id,
+      completed,
+      status,
+      planned_date
+    } = req.body;
+
+    const updates = {};
+
+    if (
+      completed !== undefined
+    ) {
+      updates.completed =
+        completed;
+    }
+
+    if (status) {
+      updates.status =
+        status;
+    }
+
+    if (planned_date) {
+      updates.planned_date =
+        planned_date;
+    }
+
+    const {
+      data,
+      error
+    } = await agentos
+      .from("agent_planning")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return res.status(200).json({
+      success: true,
+      planning: data
+    });
+
+  } catch (error) {
+
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+
+  }
+}
+
 export default async function handler(req, res) {
   try {
     const action = req.query.action;
@@ -1417,6 +1478,7 @@ export default async function handler(req, res) {
     if (action === "daily-report") return dailyReport(req, res);
     if (action === "auto-director") return autoDirector(req, res);
     if (action ==="execute-planning-actions") {return executePlanningActions(req,res);}
+    if (action ==="update-planning-status") {return updatePlanningStatus(req,res);}
 
     return res.status(400).json({
       error: "Action inconnue",

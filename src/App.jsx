@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import OperationalPlanning from "./components/OperationalPlanning";
 import {
   Brain,
   MessageSquare,
@@ -823,7 +824,10 @@ export default function App() {
                   <h3>Liste planning</h3>
                 </div>
 
-                <PlanningList items={planning} />
+                <OperationalPlanning
+  items={planning}
+  refreshPlanning={loadPlanning}
+/>
               </div>
             </section>
           </>

@@ -1590,3 +1590,268 @@ textarea:focus {
 .rbc-agenda-table td {
   border-color: rgba(255,255,255,0.08) !important;
 }
+
+/* =========================
+   OPERATIONAL PLANNING
+========================= */
+
+.ops-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+  align-items: start;
+}
+
+.ops-timeline {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 28px;
+  padding: 24px;
+  backdrop-filter: blur(18px);
+}
+
+.ops-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+.ops-header h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: white;
+  margin-top: 4px;
+}
+
+.ops-badge {
+  background: rgba(59,130,246,0.18);
+  color: #93c5fd;
+  border: 1px solid rgba(59,130,246,0.25);
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.planning-card {
+  display: flex;
+  gap: 18px;
+  padding: 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(255,255,255,0.05);
+  transition: 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.planning-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,0.12);
+}
+
+.planning-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 5px;
+  height: 100%;
+  border-radius: 12px;
+}
+
+.planning-card.urgent::before {
+  background: #ef4444;
+}
+
+.planning-card.high::before {
+  background: #f97316;
+}
+
+.planning-card.medium::before {
+  background: #3b82f6;
+}
+
+.planning-card.low::before {
+  background: #10b981;
+}
+
+.planning-time {
+  min-width: 90px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #cbd5e1;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.planning-main {
+  flex: 1;
+}
+
+.planning-top {
+  display: flex;
+  gap: 16px;
+}
+
+.planning-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #93c5fd;
+}
+
+.planning-top h3 {
+  color: white;
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+.planning-top p {
+  color: #94a3b8;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+.planning-footer {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.planning-tags {
+  display: flex;
+  gap: 10px;
+}
+
+.tag {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: #cbd5e1;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.tag.ai {
+  background: rgba(139,92,246,0.15);
+  color: #c4b5fd;
+  border-color: rgba(139,92,246,0.2);
+}
+
+.planning-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.planning-actions button {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: white;
+  border-radius: 14px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.planning-actions button:hover {
+  background: rgba(255,255,255,0.09);
+}
+
+.ops-ai-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ai-card {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 28px;
+  padding: 22px;
+  backdrop-filter: blur(18px);
+}
+
+.ai-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+
+.ai-alert {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.05);
+  padding: 14px;
+  border-radius: 18px;
+  color: #cbd5e1;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.ai-alert.warning {
+  border-color: rgba(239,68,68,0.25);
+  background: rgba(239,68,68,0.08);
+}
+
+.empty-planning {
+  height: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.empty-planning h3 {
+  margin-top: 14px;
+  margin-bottom: 8px;
+  color: white;
+}
+
+@media (max-width: 1200px) {
+  .ops-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+
+  .planning-card {
+    flex-direction: column;
+  }
+
+  .planning-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .planning-actions {
+    width: 100%;
+  }
+
+  .planning-actions button {
+    flex: 1;
+    justify-content: center;
+  }
+}
