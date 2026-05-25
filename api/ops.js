@@ -1533,6 +1533,7 @@ _La Pause Sandwich`;
 
 async function telegramCallback(req, res) {
   try {
+    await sendTelegramMessage("🧪 Callback Telegram reçu par AgentOS");
     const body = req.body || {};
     const callback = body.callback_query;
 
