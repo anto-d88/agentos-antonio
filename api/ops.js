@@ -130,7 +130,7 @@ async function createLog(agentos, log) {
   }
 }
 
-async function sendTelegramMessage(message) {
+async function sendTelegramMessage(message, options = {}) {
   try {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -151,7 +151,8 @@ async function sendTelegramMessage(message) {
         },
         body: JSON.stringify({
           chat_id: chatId,
-          text: message
+          text: message,
+          ...options
         })
       }
     );
@@ -804,18 +805,53 @@ async function checkNewOrders(req, res) {
 
   for (const order of orders || []) {
     await sendTelegramMessage(
-      `🛒 Nouvelle commande La Pause Sandwich\n\n👤 Client : ${
-        order.customer_name || "Non précisé"
-      }\n📞 Téléphone : ${
-        order.customer_phone || "Non précisé"
-      }\n🏢 Entreprise : ${
-        order.company_name || "Non précisé"
-      }\n💶 Total : ${
-        order.total_amount || order.total_price || 0
-      }€\n🕒 Créneau : ${
-        order.delivery_slot_label || order.delivery_slot || "Non précisé"
-      }\n📍 Adresse : ${order.delivery_address || "Non précisée"}`
-    );
+  `🛒 Nouvelle commande La Pause Sandwich
+
+👤 Client : ${
+  order.customer_name || "Non précisé"
+}
+📞 Téléphone : ${
+  order.customer_phone || "Non précisé"
+}
+🏢 Entreprise : ${
+  order.company_name || "Non précisé"
+}
+💶 Total : ${
+  order.total_amount || order.total_price || 0
+}€
+🕒 Créneau : ${
+  order.delivery_slot_label || order.delivery_slot || "Non précisé"
+}
+📍 Adresse : ${
+  order.delivery_address || "Non précisée"
+}`,
+{
+  reply_markup: {
+    inline_keyboard: [
+      [
+        {
+          text: "✅ Confirmation",
+          callback_data: `confirm_${order.id}`
+        },
+        {
+          text: "🚚 En route",
+          callback_data: `route_${order.id}`
+        }
+      ],
+      [
+        {
+          text: "📍 Arrivée",
+          callback_data: `arrived_${order.id}`
+        },
+        {
+          text: "🙏 Merci",
+          callback_data: `thanks_${order.id}`
+        }
+      ]
+    ]
+  }
+}
+);
 
     await sandwich
       .from("orders")
