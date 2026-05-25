@@ -1596,7 +1596,7 @@ async function testTelegramOrder(req, res) {
     };
 
     const result = await sendTelegramMessage(
-      `🛒 Nouvelle commande La Pause Sandwich
+      `🛒 Nouvelle commande test La Pause Sandwich
 
 👤 Client : ${fakeOrder.customer_name}
 📞 Téléphone : ${fakeOrder.customer_phone}
