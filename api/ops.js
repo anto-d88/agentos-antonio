@@ -1533,9 +1533,18 @@ _La Pause Sandwich`;
 
 async function telegramCallback(req, res) {
   try {
-
     const body = req.body || {};
+
+    if (!body.callback_query) {
+      return res.status(200).json({
+        success: true,
+        ignored: true
+      });
+    }
+
     const callback = body.callback_query;
+
+
 
     if (!callback?.data) {
       return res.status(200).json({
