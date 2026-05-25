@@ -1570,6 +1570,67 @@ ${clientMessage}`
   }
 }
 
+async function testTelegramOrder(req, res) {
+  try {
+    const fakeOrder = {
+      id: 999999,
+      customer_name: "Client Test",
+      customer_phone: "0600000000",
+      company_name: "Entreprise Test",
+      total_amount: 12.5,
+      delivery_slot_label: "Aujourd’hui 13h",
+      delivery_address: "Adresse test"
+    };
+
+    const result = await sendTelegramMessage(
+      `🛒 Nouvelle commande La Pause Sandwich
+
+👤 Client : ${fakeOrder.customer_name}
+📞 Téléphone : ${fakeOrder.customer_phone}
+🏢 Entreprise : ${fakeOrder.company_name}
+💶 Total : ${fakeOrder.total_amount}€
+🕒 Créneau : ${fakeOrder.delivery_slot_label}
+📍 Adresse : ${fakeOrder.delivery_address}`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "✅ Confirmation",
+                callback_data: `confirm_${fakeOrder.id}`
+              },
+              {
+                text: "🚚 En route",
+                callback_data: `route_${fakeOrder.id}`
+              }
+            ],
+            [
+              {
+                text: "📍 Arrivée",
+                callback_data: `arrived_${fakeOrder.id}`
+              },
+              {
+                text: "🙏 Merci",
+                callback_data: `thanks_${fakeOrder.id}`
+              }
+            ]
+          ]
+        }
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      telegram: result
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
+
 export default async function handler(req, res) {
   try {
     const action = req.query.action;
@@ -1601,6 +1662,7 @@ export default async function handler(req, res) {
     if (action ==="execute-planning-actions") {return executePlanningActions(req,res);}
     if (action ==="update-planning-status") {return updatePlanningStatus(req,res);}
     if (action === "telegram-callback") return telegramCallback(req, res);
+    if (action === "telegram-test-order") return testTelegramOrder(req, res);
 
     return res.status(400).json({
       error: "Action inconnue",
