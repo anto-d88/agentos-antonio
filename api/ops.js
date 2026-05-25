@@ -1544,7 +1544,18 @@ async function telegramCallback(req, res) {
 
     const callback = body.callback_query;
 
-
+await fetch(
+  `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`,
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      callback_query_id: callback.id
+    })
+  }
+);
 
     if (!callback?.data) {
       return res.status(200).json({
@@ -1553,32 +1564,47 @@ async function telegramCallback(req, res) {
       });
     }
 
-    const [type, orderId] = callback.data.split("_");
+const [type, orderId] = String(callback.data || "").split("_");
 
-    if (!type || !orderId) {
-      return res.status(200).json({
-        success: false,
-        message: "Callback invalide"
-      });
-    }
+if (!type || !orderId) {
+  return res.status(200).json({
+    success: false,
+    message: "Callback invalide"
+  });
+}
 
-    const { sandwich } = getClients();
+let order;
 
-    const { data: order, error } = await sandwich
-      .from("orders")
-      .select("*")
-      .eq("id", orderId)
-      .single();
+if (orderId === "999999") {
+  order = {
+    id: 999999,
+    customer_name: "Client Test",
+    delivery_slot_label: "Aujourd’hui 13h",
+    delivery_address: "Adresse test"
+  };
+} else {
+  const { sandwich } = getClients();
 
-    if (error) throw error;
+  const { data, error } = await sandwich
+    .from("orders")
+    .select("*")
+    .eq("id", orderId)
+    .single();
 
-    const clientMessage = buildClientMessage(type, order);
+  if (error) throw error;
+  order = data;
+}
 
-    await sendTelegramMessage(
-      `📲 Message client prêt à copier :
+const clientMessage = buildClientMessage(type, order);
 
-${clientMessage}`
-    );
+await sendTelegramMessage(
+  `📲 Message client prêt à copier :
+
+${clientMessage}`,
+  {
+    reply_to_message_id: callback.message?.message_id
+  }
+);
 
     return res.status(200).json({
       success: true,
