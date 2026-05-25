@@ -1641,7 +1641,8 @@ export default async function handler(req, res) {
     if (action === "move-planning-event") return movePlanningEvent(req, res);
     if (action === "generate-planning") return generatePlanning(req, res);
     if (action === "check-new-orders") return checkNewOrders(req, res);
-
+ if (action === "telegram-callback") return telegramCallback(req, res);
+    
     if (action === "telegram-test") {
       const result = await sendTelegramMessage(
         "✅ Test Telegram AgentOS réussi"
@@ -1652,7 +1653,7 @@ export default async function handler(req, res) {
         telegram: result
       });
     }
-
+if (action === "telegram-test-order") return testTelegramOrder(req, res);
     if (action === "check-stock") return checkStock(req, res);
     if (action === "business-overview") return businessOverview(req, res);
     if (action === "check-alerts") return checkAlerts(req, res);
@@ -1661,8 +1662,7 @@ export default async function handler(req, res) {
     if (action === "auto-director") return autoDirector(req, res);
     if (action ==="execute-planning-actions") {return executePlanningActions(req,res);}
     if (action ==="update-planning-status") {return updatePlanningStatus(req,res);}
-    if (action === "telegram-callback") return telegramCallback(req, res);
-    if (action === "telegram-test-order") return testTelegramOrder(req, res);
+   
 
     return res.status(400).json({
       error: "Action inconnue",
@@ -1675,6 +1675,7 @@ export default async function handler(req, res) {
         "daily-report",
         "auto-director",
         "telegram-test",
+        "telegram-test-order",
         "alert-update",
         "add-to-planning",
         "get-planning",
