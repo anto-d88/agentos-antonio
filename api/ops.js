@@ -1484,6 +1484,91 @@ async function updatePlanningStatus(req, res) {
 
   }
 }
+function buildClientMessage(type, order) {
+  const name = order.customer_name || "";
+  const slot = order.delivery_slot_label || order.delivery_slot || "";
+  const address = order.delivery_address || "";
+
+  if (type === "confirm") {
+    return `Bonjour ${name}, votre commande La Pause Sandwich est bien confirmée pour le créneau ${slot}. Merci pour votre confiance.
+
+_La Pause Sandwich`;
+  }
+
+  if (type === "route") {
+    return `Bonjour ${name}, votre commande La Pause Sandwich est en route. Elle arrive bientôt à l’adresse prévue : ${address}.
+
+_La Pause Sandwich`;
+  }
+
+  if (type === "arrived") {
+    return `Bonjour ${name}, votre commande La Pause Sandwich est arrivée. Je suis sur place pour le retrait.
+
+_La Pause Sandwich`;
+  }
+
+  if (type === "thanks") {
+    return `Bonjour ${name}, merci pour votre commande. Votre retour nous aide beaucoup à améliorer La Pause Sandwich.
+
+_La Pause Sandwich`;
+  }
+
+  return `Bonjour ${name}, merci pour votre commande.
+
+_La Pause Sandwich`;
+}
+
+async function telegramCallback(req, res) {
+  try {
+    const body = req.body || {};
+    const callback = body.callback_query;
+
+    if (!callback?.data) {
+      return res.status(200).json({
+        success: true,
+        message: "Aucun callback Telegram"
+      });
+    }
+
+    const [type, orderId] = callback.data.split("_");
+
+    if (!type || !orderId) {
+      return res.status(200).json({
+        success: false,
+        message: "Callback invalide"
+      });
+    }
+
+    const { sandwich } = getClients();
+
+    const { data: order, error } = await sandwich
+      .from("orders")
+      .select("*")
+      .eq("id", orderId)
+      .single();
+
+    if (error) throw error;
+
+    const clientMessage = buildClientMessage(type, order);
+
+    await sendTelegramMessage(
+      `📲 Message client prêt à copier :
+
+${clientMessage}`
+    );
+
+    return res.status(200).json({
+      success: true,
+      type,
+      orderId
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
 
 export default async function handler(req, res) {
   try {
@@ -1515,6 +1600,7 @@ export default async function handler(req, res) {
     if (action === "auto-director") return autoDirector(req, res);
     if (action ==="execute-planning-actions") {return executePlanningActions(req,res);}
     if (action ==="update-planning-status") {return updatePlanningStatus(req,res);}
+    if (action === "telegram-callback") return telegramCallback(req, res);
 
     return res.status(400).json({
       error: "Action inconnue",
