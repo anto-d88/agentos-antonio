@@ -170,15 +170,28 @@ async function businessOverview(req, res) {
   const envError = checkEnv();
   if (envError) return res.status(500).json({ error: envError });
 
+let order;
+
+if (orderId === "999999") {
+  order = {
+    id: 999999,
+    customer_name: "Client Test",
+    delivery_slot_label: "Aujourd’hui 13h",
+    delivery_address: "Adresse test"
+  };
+} else {
   const { sandwich } = getClients();
 
-  const { data: orders, error: ordersError } = await sandwich
+  const { data, error } = await sandwich
     .from("orders")
     .select("*")
-    .order("created_at", { ascending: false })
-    .limit(50);
+    .eq("id", orderId)
+    .single();
 
-  if (ordersError) throw ordersError;
+  if (error) throw error;
+
+  order = data;
+}
 
   const { data: products, error: productsError } = await sandwich
     .from("products")
