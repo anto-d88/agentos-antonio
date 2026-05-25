@@ -1646,7 +1646,9 @@ async function testTelegramOrder(req, res) {
 
 export default async function handler(req, res) {
   try {
-    const action = req.query.action;
+    const action =
+  req.query.action ||
+  (req.body?.callback_query ? "telegram-callback" : null);
 
     if (action === "alert-update") return updateAlert(req, res);
     if (action === "add-to-planning") return addToPlanning(req, res);
